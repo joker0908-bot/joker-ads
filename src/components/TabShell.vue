@@ -6,22 +6,15 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import TabBar from './TabBar.vue'
-import { useSiteConfig } from '../composables/useSiteConfig.js'
+import { useTabbar } from '../composables/useTabbar.js'
 import tabsFallback from '../data/tabs.json'
 
 defineProps({ active: { type: String, default: 'apps' } })
 
 const router = useRouter()
-const siteConfig = useSiteConfig()
-const tabbar = computed(() => siteConfig.config.tabbar || [])
-const routeMap = computed(() => {
-  const live = siteConfig.tabs?.routes
-  if (live && Object.keys(live).length) return live
-  return tabsFallback.routes
-})
+const { items: tabbar, routes: routeMap } = useTabbar()
 
 function onChange(id) {
   const path = routeMap.value[id] || tabsFallback.routes?.[id] || '/appcenter'

@@ -36,21 +36,20 @@
       <article class="pay-card pay-card--vip">
         <span class="pay-card__eyebrow">MEMBER</span>
         <strong>VIP 会员中心</strong>
-        <p>会员权益尚未接入</p>
-        <button @click="goRecharge('vip')">查看状态</button>
+        <p v-if="customer.isVip">有效期至 {{ customer.vipUntil }}</p>
+        <button @click="goRecharge('vip')">立即开通</button>
       </article>
       <article class="pay-card pay-card--gold">
         <span class="pay-card__eyebrow">WALLET</span>
         <strong>钻石充值</strong>
-        <p>充值已暂停，当前不发放奖励</p>
-        <button @click="goRecharge('gold')">查看订单说明</button>
+        <p>余额 {{ customer.diamonds }} 钻</p>
+        <button @click="goRecharge('gold')">立即充值</button>
       </article>
     </div>
 
     <section class="task-card" @click="router.push('/activityPage/dailyCheckIn')">
       <div>
         <strong>每日任务</strong>
-        <p>签到尚未接入，当前不发放奖励</p>
       </div>
       <span class="task-card__go">前往</span>
     </section>
@@ -199,7 +198,7 @@ async function loadUser() {
 
 async function refresh() {
   try {
-    await refreshCustomer()
+    await Promise.all([loadUser(), refreshCustomer()])
     showToast('已刷新')
   } catch {
     showToast('刷新失败，请稍后再试')
@@ -208,6 +207,7 @@ async function refresh() {
 
 onMounted(() => {
   loadUser().catch(() => {})
+  refreshCustomer().catch(() => {})
 })
 </script>
 

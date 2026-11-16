@@ -4,10 +4,14 @@
     <section v-if="siteConfig.error" role="status" class="config-error">
       {{ siteConfig.error }} <button @click="loadSiteConfig">重试</button>
     </section>
-    <router-view />
-    <AdPopup v-if="!isWatching" :popups="siteConfig.config.popups" />
+    <router-view v-slot="{ Component }">
+      <KeepAlive include="VideoPage">
+        <component :is="Component" />
+      </KeepAlive>
+    </router-view>
+    <AdPopup v-if="!isWatching && !isInvite && !customerState.isVip" :popups="siteConfig.config.popups" />
     <ToastHost />
-    <IdentityCard v-model="showCard" />
+    <IdentityCard v-if="!isInvite" v-model="showCard" />
   </div>
 </template>
 
@@ -23,12 +27,14 @@ import ToastHost from './components/ToastHost.vue'
 const siteConfig = useSiteConfig()
 const route = useRoute()
 const showCard = ref(false)
+const isInvite = computed(() => route.path === '/invite')
 watch(() => customerState.ready, () => {
-  if (shouldAutoShowCard()) { showCard.value = true; markCardShown() }
+  if (!isInvite.value && shouldAutoShowCard()) { showCard.value = true; markCardShown() }
 }, { immediate: true })
-const isWatching = computed(
-  () => route.path.startsWith('/play/') || route.path.startsWith('/short'),
-)
+const isWatching = computed(() => {
+  const p = route.path
+  return p.startsWith('/play/') || p.startsWith('/short') || (p.startsWith('/video/') && p !== '/video/search')
+})
 </script>
 
 <style scoped>

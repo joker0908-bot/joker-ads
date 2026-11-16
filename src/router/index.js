@@ -10,9 +10,16 @@ import BenefitsPage from '../views/BenefitsPage.vue'
 import SharePage from '../views/SharePage.vue'
 import DailyTaskPage from '../views/DailyTaskPage.vue'
 import MessagePage from '../views/MessagePage.vue'
+import InvitePage from '../views/InvitePage.vue'
+import VideoPage from '../views/VideoPage.vue'
+import VideoPlayPage from '../views/VideoPlayPage.vue'
 
 const routes = [
-  { path: '/', redirect: '/appcenter' },
+  { path: '/', redirect: '/invite' },
+  { path: '/invite', name: 'invite', component: InvitePage },
+  { path: '/video', name: 'video', component: VideoPage },
+  { path: '/video/search', name: 'video-search', component: VideoPage },
+  { path: '/video/:id', name: 'video-play', component: VideoPlayPage },
   { path: '/appcenter', name: 'appcenter', component: AppCenter },
   { path: '/videosPage', component: FeaturedPage },
   { path: '/short', component: DouyinPage },
