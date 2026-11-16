@@ -19,7 +19,7 @@ cd android
 ./gradlew --no-daemon assembleRelease testDebugUnitTest lintRelease
 ```
 
-Windows 使用 `gradlew.bat`。SDK 通过 `ANDROID_HOME` 或未入库的 `local.properties` 配置。输出 `app/build/outputs/apk/release/app-release-unsigned.apk`；CI 只保存未签名产物，不持有正式私钥。
+Windows 使用 `gradlew.bat`。SDK 通过 `ANDROID_HOME` 或未入库的 `local.properties` 配置。自托管 runner 没有预装 SDK，`.github/workflows/verify.yml` 会在任务里安装 Platform 35 和 Build-Tools 35.0.0。输出 `app/build/outputs/apk/release/app-release-unsigned.apk`；CI 只保存未签名产物，不持有正式私钥。
 
 正式签名在本地完成。`scripts/sign-android.ps1` 使用本机受保护的签名目录；密码由 Windows 当前用户加密保存，不进入 Git。安装交付以签名验证及 SHA-256 记录为准。
 
