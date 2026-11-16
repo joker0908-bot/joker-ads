@@ -20,28 +20,28 @@ const router = useRouter()
 
 <style scoped>
 .sub-page {
-  background: var(--dw-bg);
-  color: var(--dw-text);
+  background: var(--bl-bg);
+  color: var(--bl-text);
   min-height: 100vh;
   padding-bottom: 0.8rem;
 }
 .sub-page__head {
   align-items: center;
   background: rgba(9, 11, 14, 0.92);
-  border-bottom: 1px solid var(--dw-hair);
+  border-bottom: 1px solid var(--bl-hair);
   display: flex;
   gap: 0.16rem;
-  padding: 0.24rem var(--dw-pad-x) 0.26rem;
+  padding: 0.24rem var(--bl-pad-x) 0.26rem;
   position: sticky;
   top: 0;
   z-index: 10;
   backdrop-filter: blur(12px);
 }
 .sub-page__back {
-  background: var(--dw-surface-2);
-  border: 1px solid var(--dw-hair);
+  background: var(--bl-surface-2);
+  border: 1px solid var(--bl-hair);
   border-radius: 50%;
-  color: var(--dw-text);
+  color: var(--bl-text);
   font-size: 0.44rem;
   height: 0.72rem;
   line-height: 0.64rem;
@@ -54,6 +54,6 @@ const router = useRouter()
   letter-spacing: 0.06em;
 }
 .sub-page__body {
-  padding: 0.28rem var(--dw-pad-x);
+  padding: 0.28rem var(--bl-pad-x);
 }
 </style>

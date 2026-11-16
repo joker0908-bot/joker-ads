@@ -15,6 +15,7 @@ import subprocess
 import tarfile
 import tempfile
 
+# 下面两条锚点必须与归档生产包里的旧菜单文案逐字一致。说明见 deploy/BRAND-MIGRATION.md。
 BASE_JS = "index-BJq_-mQY.js"
 BASE_JS_SHA = "6641b7b64eab3b0a262554ef1c427170f09d316cc8615b564ec29cc4a4be9f40"
 BASE_HTML_SHA = "8c63997a93e532dbd1f81cb678701f9c99ceebc42321969d36ab0cc91faa2e3a"

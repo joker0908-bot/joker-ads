@@ -4,10 +4,10 @@
       <div class="card" ref="cardEl" @click.stop>
         <div class="card__shine" aria-hidden="true" />
         <header class="card__head">
-          <img src="/brand/logo.png" alt="得污" width="48" height="48" />
+          <img src="/brand/logo.png" alt="菠萝视频" width="48" height="48" />
           <div>
-            <strong>得污身份卡</strong>
-            <span>得污 · 成人版</span>
+            <strong>菠萝视频身份卡</strong>
+            <span>菠萝视频 · 成人版</span>
           </div>
         </header>
         <ul class="card__rows">
@@ -28,7 +28,7 @@
           </li>
         </ul>
         <div class="card__qr">
-          <img v-if="qr" :src="qr" alt="得污邀请二维码" />
+          <img v-if="qr" :src="qr" alt="菠萝视频邀请二维码" />
           <p v-else>二维码生成中…</p>
         </div>
         <p v-if="customer.error" class="card__err">{{ customer.error }}</p>
@@ -42,7 +42,7 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { claimCustomer, customerState, dewuInviteUrl } from '../composables/useCustomer.js'
+import { claimCustomer, customerState, boluoInviteUrl } from '../composables/useCustomer.js'
 import { qrDataUrl } from '../lib/qr.js'
 import { copyText, showToast } from '../composables/useToast.js'
 
@@ -58,7 +58,7 @@ const open = computed({
 })
 const qr = ref('')
 const cardEl = ref(null)
-const inviteUrl = computed(() => dewuInviteUrl(customer.inviteCode))
+const inviteUrl = computed(() => boluoInviteUrl(customer.inviteCode))
 
 watch(
   () => [open.value, inviteUrl.value],
@@ -69,7 +69,7 @@ watch(
     }
     if (!url) return
     try {
-      qr.value = await qrDataUrl(dewuInviteUrl(customer.inviteCode), 280)
+      qr.value = await qrDataUrl(boluoInviteUrl(customer.inviteCode), 280)
     } catch {
       qr.value = ''
     }
@@ -95,22 +95,23 @@ async function save() {
   canvas.width = w
   canvas.height = h
   const ctx = canvas.getContext('2d')
-  ctx.fillStyle = '#090b0e'
+  ctx.fillStyle = '#0B0716'
   ctx.fillRect(0, 0, w, h)
   const g = ctx.createLinearGradient(0, 0, w, h)
-  g.addColorStop(0, '#11151b')
-  g.addColorStop(1, '#050607')
+  g.addColorStop(0, '#2a1848')
+  g.addColorStop(0.55, '#140C26')
+  g.addColorStop(1, '#07040f')
   ctx.fillStyle = g
   ctx.fillRect(36, 36, w - 72, h - 72)
-  ctx.strokeStyle = 'rgba(0,200,232,0.45)'
+  ctx.strokeStyle = 'rgba(255, 79, 216, 0.55)'
   ctx.lineWidth = 3
   ctx.strokeRect(36, 36, w - 72, h - 72)
-  ctx.fillStyle = '#00c8e8'
+  ctx.fillStyle = '#FFE56A'
   ctx.font = '700 28px sans-serif'
-  ctx.fillText('得污 · 成人版', 72, 110)
-  ctx.fillStyle = '#eef2f6'
+  ctx.fillText('菠萝视频 · 成人版', 72, 110)
+  ctx.fillStyle = '#F7F3FF'
   ctx.font = '700 44px sans-serif'
-  ctx.fillText('得污身份卡', 72, 170)
+  ctx.fillText('菠萝视频身份卡', 72, 170)
   const lines = [
     ['客户ID', customer.customerId],
     ['身份卡号', customer.cardNo],
@@ -143,10 +144,10 @@ async function save() {
   if (url.length > 42) ctx.fillText(url.slice(42), 72, 886)
   const a = document.createElement('a')
   a.href = canvas.toDataURL('image/png')
-  a.download = `${customer.cardNo || 'dewu-card'}.png`
-  if (window.DewuBridge?.saveImage) {
+  a.download = `${customer.cardNo || 'boluo-card'}.png`
+  if (window.BoluoBridge?.saveImage) {
     try {
-      const result = await window.DewuBridge.saveImage(a.href, a.download)
+      const result = await window.BoluoBridge.saveImage(a.href, a.download)
       if (result?.status === 'cancelled') showToast('已取消保存')
       else showToast('身份卡已保存')
     } catch { showToast('保存失败，请重试') }
@@ -169,10 +170,10 @@ async function save() {
   z-index: 80;
 }
 .card {
-  background: linear-gradient(165deg, #151b22 0%, #090b0e 70%);
-  border: 1px solid var(--dw-line);
+  background: linear-gradient(165deg, #2a1848 0%, #0B0716 70%);
+  border: 1px solid var(--bl-line);
   border-radius: 20px;
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+  box-shadow: var(--bl-glow-shadow), 0 24px 80px rgba(0, 0, 0, 0.55);
   max-width: 360px;
   overflow: hidden;
   padding: 22px 22px 20px;
@@ -180,7 +181,7 @@ async function save() {
   width: calc(100vw - 40px);
 }
 .card__shine {
-  background: radial-gradient(circle at 20% 0%, rgba(0, 200, 232, 0.18), transparent 50%);
+  background: radial-gradient(circle at 20% 0%, rgba(255, 229, 106, 0.22), transparent 50%);
   inset: 0;
   pointer-events: none;
   position: absolute;
@@ -201,7 +202,7 @@ async function save() {
   font-size: 20px;
 }
 .card__head span {
-  color: var(--dw-cyan);
+  color: var(--bl-accent);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -219,7 +220,7 @@ async function save() {
   padding: 8px 0;
 }
 .card__rows em {
-  color: var(--dw-muted);
+  color: var(--bl-muted);
   font-size: 12px;
   font-style: normal;
 }
@@ -232,7 +233,7 @@ async function save() {
 .card__rows button {
   background: none;
   border: none;
-  color: var(--dw-cyan);
+  color: var(--bl-accent);
   font-size: 12px;
 }
 .card__qr {
@@ -254,17 +255,17 @@ async function save() {
 }
 .card__qr p,
 .card__url {
-  color: var(--dw-faint);
+  color: var(--bl-faint);
   font-size: 11px;
   margin-top: 10px;
   text-align: center;
   word-break: break-all;
 }
 .card__save {
-  background: var(--dw-cyan);
+  background: var(--bl-grad); box-shadow: var(--bl-glow-shadow);
   border: none;
   border-radius: 999px;
-  color: var(--dw-ink-on-cyan);
+  color: var(--bl-on-accent);
   display: block;
   font-weight: 700;
   margin: 16px auto 0;

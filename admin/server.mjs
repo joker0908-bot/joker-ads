@@ -429,7 +429,7 @@ app.post('/api/admin/totp/setup', requireAuth, requireWrite('settings'), async (
   getDb().prepare('UPDATE admins SET totp_secret = ?, totp_enabled = 0, updated_at = ? WHERE id = ?').run(secret, now(), req.admin.id)
   res.json({
     secret,
-    otpauth: totp.otpauthUrl({ secret, issuer: '得污后台', account: req.admin.username }),
+    otpauth: totp.otpauthUrl({ secret, issuer: '菠萝视频后台', account: req.admin.username }),
   })
 })
 

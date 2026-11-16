@@ -1,4 +1,4 @@
-package cn.b12sl5x.dewu;
+package cn.b12sl5x.boluo;
 
 final class NativeRequestPolicy {
     private NativeRequestPolicy() {}
@@ -11,6 +11,6 @@ final class NativeRequestPolicy {
         return true;
     }
     static String safeFilename(String name) {
-        return name != null && name.matches("[A-Za-z0-9_-]{1,80}\\.png") ? name : "dewu-card.png";
+        return name != null && name.matches("[A-Za-z0-9_-]{1,80}\\.png") ? name : "boluo-card.png";
     }
 }

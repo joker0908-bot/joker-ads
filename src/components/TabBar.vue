@@ -31,12 +31,12 @@ const icons = {
 
 <style scoped>
 .tabbar {
-  background: rgba(8, 10, 13, 0.94);
-  border-top: 1px solid var(--dw-hair);
+  background: rgba(11, 7, 22, 0.92);
+  border-top: 1px solid var(--bl-hair);
   bottom: 0;
   box-sizing: border-box;
   display: flex;
-  height: var(--dw-tabbar-h);
+  height: var(--bl-tabbar-h);
   left: 0;
   padding-bottom: env(safe-area-inset-bottom);
   position: fixed;
@@ -49,7 +49,7 @@ const icons = {
 .tabbar-item {
   align-items: center;
   background: transparent;
-  color: var(--dw-faint);
+  color: var(--bl-faint);
   cursor: pointer;
   display: flex;
   flex: 1;
@@ -58,15 +58,16 @@ const icons = {
   line-height: 1;
   padding: 0.14rem 0;
   position: relative;
-  transition: color 0.2s var(--dw-ease);
+  transition: color 0.2s var(--bl-ease);
 }
 
 .tabbar-item.is-active {
-  color: var(--dw-cyan);
+  color: var(--bl-accent);
+  text-shadow: 0 0 12px rgba(255, 79, 216, 0.65);
 }
 
 .tabbar-item.is-active::before {
-  background: var(--dw-cyan);
+  background: var(--bl-grad); box-shadow: var(--bl-glow-shadow);
   border-radius: 99px;
   content: '';
   height: 0.05rem;

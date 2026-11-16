@@ -136,10 +136,10 @@ async function search() {
   padding: 0.2rem 0.32rem;
 }
 .search-head__back {
-  background: var(--dw-cyan-dim);
-  border: 1px solid var(--dw-line);
+  background: var(--bl-accent-dim);
+  border: 1px solid var(--bl-line);
   border-radius: 50%;
-  color: var(--dw-cyan-soft);
+  color: var(--bl-accent-soft);
   font-size: 0.48rem;
   height: 0.72rem;
   line-height: 0.64rem;
@@ -158,10 +158,10 @@ async function search() {
   width: 100%;
 }
 .search-head__go {
-  background: var(--dw-cyan);
+  background: var(--bl-grad); box-shadow: var(--bl-glow-shadow);
   border: none;
   border-radius: 0.8rem;
-  color: #061018;
+  color: #140C26;
   font-size: 0.28rem;
   font-weight: 700;
   padding: 0.14rem 0.24rem;
@@ -173,7 +173,7 @@ async function search() {
   padding: 0 0.32rem 0.24rem;
 }
 .chip {
-  background: var(--dw-surface-2);
+  background: var(--bl-surface-2);
   border: none;
   border-radius: 0.8rem;
   color: rgba(255, 255, 255, 0.75);

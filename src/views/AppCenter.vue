@@ -114,7 +114,7 @@ watch(
 
 <style scoped>
 .application {
-  background: var(--dw-bg);
+  background: var(--bl-bg);
   min-height: 100vh;
 }
 
@@ -123,20 +123,20 @@ watch(
 }
 
 .content--with-tabbar {
-  padding-bottom: calc(var(--dw-tabbar-h) + env(safe-area-inset-bottom) + 1.4rem);
+  padding-bottom: calc(var(--bl-tabbar-h) + env(safe-area-inset-bottom) + 1.4rem);
 }
 
 .apps-meta {
-  color: var(--dw-muted);
+  color: var(--bl-muted);
   font-size: 0.24rem;
   letter-spacing: 0.04em;
-  padding: 0.2rem var(--dw-pad-x) 0.04rem;
+  padding: 0.2rem var(--bl-pad-x) 0.04rem;
 }
 
 .apps-empty {
-  color: var(--dw-muted);
+  color: var(--bl-muted);
   font-size: 0.3rem;
-  padding: 1.2rem var(--dw-pad-x);
+  padding: 1.2rem var(--bl-pad-x);
   text-align: center;
 }
 </style>

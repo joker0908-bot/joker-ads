@@ -20,9 +20,9 @@ New-Item -ItemType Directory -Force -Path $keyRoot | Out-Null
 $userSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 & icacls.exe $keyRoot /inheritance:r /grant:r "*$($userSid):(OI)(CI)F" '*S-1-5-18:(OI)(CI)F' | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'Could not protect the signing directory.' }
-$keyFile = Join-Path $keyRoot 'dewu-release.p12'
+$keyFile = Join-Path $keyRoot 'boluo-release.p12'
 $passwordFile = Join-Path $keyRoot 'password.dpapi'
-$previousPassword = $env:DEWU_APK_PASSWORD
+$previousPassword = $env:BOLUO_APK_PASSWORD
 $previousJava = $env:JAVA_HOME
 $aligned = $null
 try {
@@ -34,24 +34,24 @@ try {
         $generator = [Security.Cryptography.RandomNumberGenerator]::Create()
         $generator.GetBytes($randomBytes)
         $generator.Dispose()
-        $env:DEWU_APK_PASSWORD = [Convert]::ToBase64String($randomBytes)
-        $secure = ConvertTo-SecureString $env:DEWU_APK_PASSWORD -AsPlainText -Force
+        $env:BOLUO_APK_PASSWORD = [Convert]::ToBase64String($randomBytes)
+        $secure = ConvertTo-SecureString $env:BOLUO_APK_PASSWORD -AsPlainText -Force
         ConvertFrom-SecureString $secure | Set-Content -LiteralPath $passwordFile -Encoding ascii
-        & (Join-Path $Jdk 'bin/keytool.exe') -genkeypair -alias dewu-release -keyalg RSA -keysize 3072 -validity 10000 `
-            -dname 'CN=Dewu Android Release' -storetype PKCS12 -keystore $keyFile `
-            -storepass:env DEWU_APK_PASSWORD -keypass:env DEWU_APK_PASSWORD
+        & (Join-Path $Jdk 'bin/keytool.exe') -genkeypair -alias boluo-release -keyalg RSA -keysize 3072 -validity 10000 `
+            -dname 'CN=Boluo Video' -storetype PKCS12 -keystore $keyFile `
+            -storepass:env BOLUO_APK_PASSWORD -keypass:env BOLUO_APK_PASSWORD
         if ($LASTEXITCODE -ne 0) { throw 'Key generation failed; preserve the key directory for recovery.' }
     } else {
         $secure = ConvertTo-SecureString (Get-Content -LiteralPath $passwordFile -Raw).Trim()
-        $env:DEWU_APK_PASSWORD = [Net.NetworkCredential]::new('', $secure).Password
+        $env:BOLUO_APK_PASSWORD = [Net.NetworkCredential]::new('', $secure).Password
     }
     $outputDirectory = Split-Path -Parent $outputFile
     New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
     $aligned = Join-Path $outputDirectory ('.aligned-' + [Guid]::NewGuid().ToString('N') + '.apk')
     & (Join-Path $BuildTools 'zipalign.exe') -P 16 -f 4 $inputFile $aligned
     if ($LASTEXITCODE -ne 0) { throw 'APK alignment failed.' }
-    & (Join-Path $BuildTools 'apksigner.bat') sign --ks $keyFile --ks-key-alias dewu-release `
-        --ks-pass env:DEWU_APK_PASSWORD --key-pass env:DEWU_APK_PASSWORD --out $outputFile $aligned
+    & (Join-Path $BuildTools 'apksigner.bat') sign --ks $keyFile --ks-key-alias boluo-release `
+        --ks-pass env:BOLUO_APK_PASSWORD --key-pass env:BOLUO_APK_PASSWORD --out $outputFile $aligned
     if ($LASTEXITCODE -ne 0) { throw 'APK signing failed.' }
     $verification = & (Join-Path $BuildTools 'apksigner.bat') verify --verbose --print-certs $outputFile
     if ($LASTEXITCODE -ne 0) { throw 'Signed APK did not verify.' }
@@ -61,7 +61,7 @@ try {
     Write-Output "Signed and verified: $outputFile"
     Write-Output "SHA-256: $hash"
 } finally {
-    $env:DEWU_APK_PASSWORD = $previousPassword
+    $env:BOLUO_APK_PASSWORD = $previousPassword
     $env:JAVA_HOME = $previousJava
     if ($aligned -and (Test-Path -LiteralPath $aligned)) { Remove-Item -LiteralPath $aligned }
 }

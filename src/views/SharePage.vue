@@ -27,13 +27,13 @@ import { computed, onMounted, ref } from 'vue'
 import SubPage from '../components/SubPage.vue'
 import { normalizeAccount } from '../api/normalize.js'
 import { copyText, showToast } from '../composables/useToast.js'
-import { customerState, dewuInviteUrl, refreshCustomer } from '../composables/useCustomer.js'
+import { customerState, boluoInviteUrl, refreshCustomer } from '../composables/useCustomer.js'
 
 const account = ref(normalizeAccount(null))
 const customer = customerState
 
 const shareCode = computed(() => customer.inviteCode || account.value.inviteCode)
-const shareLink = computed(() => dewuInviteUrl(shareCode.value))
+const shareLink = computed(() => boluoInviteUrl(shareCode.value))
 
 async function copy(value, label) {
   if (!value) {
@@ -55,7 +55,7 @@ onMounted(loadShare)
 
 <style scoped>
 .invite {
-  background: linear-gradient(145deg, rgba(0,212,255,0.2), rgba(0,80,110,0.35)), var(--dw-surface); border: 1px solid var(--dw-line);
+  background: linear-gradient(145deg, rgba(0,212,255,0.2), rgba(0,80,110,0.35)), var(--bl-surface); border: 1px solid var(--bl-line);
   border-radius: 0.16rem;
   margin-bottom: 0.24rem;
   padding: 0.36rem 0.28rem;
@@ -72,10 +72,10 @@ onMounted(loadShare)
   margin: 0.12rem 0 0.2rem;
 }
 .invite__copy {
-  background: var(--dw-cyan);
+  background: var(--bl-grad); box-shadow: var(--bl-glow-shadow);
   border: none;
   border-radius: 0.8rem;
-  color: #061018;
+  color: #140C26;
   font-size: 0.28rem;
   font-weight: 700;
   margin-top: 0.16rem;
@@ -87,7 +87,7 @@ onMounted(loadShare)
   opacity: 0.85;
 }
 .link {
-  background: var(--dw-surface);
+  background: var(--bl-surface);
   border-radius: 0.16rem;
   margin-bottom: 0.24rem;
   padding: 0.24rem;
@@ -102,7 +102,7 @@ onMounted(loadShare)
   word-break: break-all;
 }
 .link__copy {
-  background: var(--dw-surface-2);
+  background: var(--bl-surface-2);
   border: none;
   border-radius: 0.8rem;
   color: #fff;

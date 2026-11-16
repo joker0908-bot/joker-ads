@@ -1,4 +1,4 @@
-package cn.b12sl5x.dewu;
+package cn.b12sl5x.boluo;
 
 import org.junit.Test;
 import static org.junit.Assert.*;

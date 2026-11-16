@@ -66,7 +66,7 @@ function iconText(name) {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0.28rem 0.14rem;
-  margin: 0 var(--dw-pad-x);
+  margin: 0 var(--bl-pad-x);
   padding: 0.28rem 0 0.48rem;
   width: auto;
 }
@@ -82,25 +82,25 @@ function iconText(name) {
 
 .app-card__cover {
   aspect-ratio: 1;
-  background: var(--dw-surface-2);
-  border: 1px solid var(--dw-hair);
+  background: var(--bl-surface-2);
+  border: 1px solid var(--bl-hair);
   border-radius: 0.28rem;
   box-shadow: 0 0.1rem 0.28rem rgba(0, 0, 0, 0.28);
   margin: 0 auto;
   max-width: 1.28rem;
   overflow: hidden;
-  transition: transform 0.2s var(--dw-ease), border-color 0.2s var(--dw-ease);
+  transition: transform 0.2s var(--bl-ease), border-color 0.2s var(--bl-ease);
   width: 100%;
 }
 
 .app-card:active .app-card__cover {
-  border-color: var(--dw-line);
+  border-color: var(--bl-line);
   transform: scale(0.96);
 }
 
 .cover-img {
   align-items: center;
-  color: var(--dw-cyan-soft);
+  color: var(--bl-accent-soft);
   display: flex;
   height: 100%;
   justify-content: center;
@@ -118,7 +118,7 @@ function iconText(name) {
 }
 
 .app-card__name {
-  color: var(--dw-muted);
+  color: var(--bl-muted);
   display: block;
   font-size: 0.24rem;
   line-height: 1.3;

@@ -18,7 +18,9 @@ concurrency:
   cancel-in-progress: false
 jobs:
   deploy:
-    runs-on: [self-hosted, linux, x64]
+    # 自建 runner 到部署端口会超时（2026-11-01 约 42 秒且无输出）。
+    # 这一 job 改回 GitHub 托管 runner，与 2026-10-07 成功的那次相同。部署目标不变。
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     environment:
       name: production
@@ -50,16 +52,7 @@ jobs:
         env:
           DEPLOY_KEY: ${{ secrets.AD_SYNC_DEPLOY_KEY }}
           DEPLOY_KNOWN_HOSTS: ${{ secrets.AD_SYNC_KNOWN_HOSTS }}
-        run: |
-          umask 077
-          mkdir -p "$RUNNER_TEMP/ad-sync-ssh"
-          printf '%s\n' "$DEPLOY_KEY" > "$RUNNER_TEMP/ad-sync-ssh/id_ed25519"
-          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$RUNNER_TEMP/ad-sync-ssh/known_hosts"
-          ssh -i "$RUNNER_TEMP/ad-sync-ssh/id_ed25519" -p 32356 \
-            -o BatchMode=yes -o StrictHostKeyChecking=yes \
-            -o UserKnownHostsFile="$RUNNER_TEMP/ad-sync-ssh/known_hosts" \
-            -o ConnectTimeout=20 -o ServerAliveInterval=15 \
-            root@107.149.129.35 "$GITHUB_SHA"
+        run: bash deploy/ci-ssh-invoke.sh
       - name: Verify public deployment receipt
         env:
           EXPECTED_REVISION: ${{ github.sha }}

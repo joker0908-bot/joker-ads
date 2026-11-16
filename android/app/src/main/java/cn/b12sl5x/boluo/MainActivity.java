@@ -1,4 +1,4 @@
-package cn.b12sl5x.dewu;
+package cn.b12sl5x.boluo;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
@@ -46,7 +46,7 @@ public final class MainActivity extends Activity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         frame = new FrameLayout(this);
-        frame.setBackgroundColor(Color.rgb(8, 13, 18));
+        frame.setBackgroundColor(Color.rgb(11, 7, 22));
         frame.setOnApplyWindowInsetsListener((view, insets) -> {
             view.setPadding(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(),
                     insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom());
@@ -55,7 +55,7 @@ public final class MainActivity extends Activity {
         web = new WebView(this);
         frame.addView(web, new FrameLayout.LayoutParams(-1, -1));
         setContentView(frame);
-        web.setBackgroundColor(Color.rgb(8, 13, 18));
+        web.setBackgroundColor(Color.rgb(11, 7, 22));
         WebSettings settings = web.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
@@ -116,7 +116,7 @@ public final class MainActivity extends Activity {
             while ((count = stream.read(buffer)) != -1) bytes.write(buffer, 0, count);
             bridgeScript = bytes.toString("UTF-8");
         } catch (Exception ex) { return; }
-        WebViewCompat.addWebMessageListener(web, "DewuNative", Collections.singleton("https://b12sl5x.cn"),
+        WebViewCompat.addWebMessageListener(web, "BoluoNative", Collections.singleton("https://b12sl5x.cn"),
                 (view, message, source, mainFrame, reply) -> {
                     if (!mainFrame || !UrlPolicy.isMain(source.toString())) return;
                     String data = message.getData();
@@ -129,7 +129,7 @@ public final class MainActivity extends Activity {
                         if ("copy".equals(value.optString("type"))) {
                             String text = value.optString("text");
                             if (!NativeRequestPolicy.canCopy(text)) { replyResult(reply, requestId, "error", "TEXT_TOO_LONG"); return; }
-                            ((ClipboardManager) getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("得污", text));
+                            ((ClipboardManager) getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("菠萝视频", text));
                             replyResult(reply, requestId, "success", "");
                         } else if ("saveImage".equals(value.optString("type"))) {
                             saveImage(value.optString("data"), value.optString("name"), requestId, reply);
