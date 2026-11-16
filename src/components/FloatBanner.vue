@@ -33,9 +33,9 @@ function open() {
 .float-banner {
   align-items: center;
   background: rgba(17, 21, 27, 0.96);
-  border: 1px solid var(--dw-hair);
-  border-radius: var(--dw-radius-lg);
-  bottom: calc(var(--dw-tabbar-h) + env(safe-area-inset-bottom) + 0.2rem);
+  border: 1px solid var(--bl-hair);
+  border-radius: var(--bl-radius-lg);
+  bottom: calc(var(--bl-tabbar-h) + env(safe-area-inset-bottom) + 0.2rem);
   box-shadow: 0 0.18rem 0.48rem rgba(0, 0, 0, 0.45);
   display: flex;
   gap: 0.16rem;
@@ -50,9 +50,9 @@ function open() {
 
 .float-banner__icon {
   align-items: center;
-  background: var(--dw-cyan);
-  border-radius: var(--dw-radius-sm);
-  color: var(--dw-ink-on-cyan);
+  background: var(--bl-grad); box-shadow: var(--bl-glow-shadow);
+  border-radius: var(--bl-radius-sm);
+  color: var(--bl-on-accent);
   display: flex;
   font-size: 0.26rem;
   font-weight: 800;
@@ -71,7 +71,7 @@ function open() {
 }
 
 .float-banner__text strong {
-  color: var(--dw-text);
+  color: var(--bl-text);
   font-size: 0.28rem;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -79,17 +79,17 @@ function open() {
 }
 
 .float-banner__text span {
-  color: var(--dw-muted);
+  color: var(--bl-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .float-banner__btn {
-  background: var(--dw-cyan);
+  background: var(--bl-grad); box-shadow: var(--bl-glow-shadow);
   border: none;
   border-radius: 999px;
-  color: var(--dw-ink-on-cyan);
+  color: var(--bl-on-accent);
   flex-shrink: 0;
   font-size: 0.26rem;
   font-weight: 700;
@@ -99,7 +99,7 @@ function open() {
 .float-banner__close {
   background: transparent;
   border: none;
-  color: var(--dw-faint);
+  color: var(--bl-faint);
   font-size: 0.36rem;
   line-height: 1;
   padding: 0 0.04rem;

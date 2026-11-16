@@ -1,10 +1,10 @@
 (() => {
   if (window.top !== window || location.origin !== 'https://b12sl5x.cn' ||
-      !window.DewuNative || window.__dewuNativeReady) return;
-  window.__dewuNativeReady = true;
+      !window.BoluoNative || window.__boluoNativeReady) return;
+  window.__boluoNativeReady = true;
   const pending = new Map();
   let sequence = 0;
-  DewuNative.onmessage = event => {
+  BoluoNative.onmessage = event => {
     let result;
     try { result = JSON.parse(event.data); } catch (_) { return; }
     const task = pending.get(result.id);
@@ -15,23 +15,23 @@
     else task.resolve(result);
   };
   const request = (message, timeoutMs) => new Promise((resolve, reject) => {
-    const id = 'dewu-' + Date.now().toString(36) + '-' + (++sequence);
+    const id = 'boluo-' + Date.now().toString(36) + '-' + (++sequence);
     const timer = timeoutMs ? setTimeout(() => {
       if (!pending.delete(id)) return;
       reject(new Error('原生操作超时'));
     }, timeoutMs) : null;
     pending.set(id, { resolve, reject, timer });
-    try { DewuNative.postMessage(JSON.stringify({ ...message, id })); }
+    try { BoluoNative.postMessage(JSON.stringify({ ...message, id })); }
     catch (error) { clearTimeout(timer); pending.delete(id); reject(error); }
   });
-  window.DewuBridge = {
+  window.BoluoBridge = {
     copyText: text => request({ type: 'copy', text: String(text) }, 5000),
-    saveImage: (data, name = 'dewu-card.png') => request({ type: 'saveImage', data, name }, 0),
+    saveImage: (data, name = 'boluo-card.png') => request({ type: 'saveImage', data, name }, 0),
   };
   const save = anchor => {
     if (!anchor.href.startsWith('data:image/png;base64,')) return false;
-    // Compatibility only. New pages await DewuBridge.saveImage directly.
-    void window.DewuBridge.saveImage(anchor.href, anchor.download || 'dewu-card.png').catch(() => {});
+    // 仅作兼容。新页面应直接 await BoluoBridge.saveImage。
+    void window.BoluoBridge.saveImage(anchor.href, anchor.download || 'boluo-card.png').catch(() => {});
     return true;
   };
   const originalClick = HTMLAnchorElement.prototype.click;
@@ -44,9 +44,9 @@
   }, true);
   try {
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
-      writeText: text => window.DewuBridge.copyText(text).then(result => {
+      writeText: text => window.BoluoBridge.copyText(text).then(result => {
         if (result.status !== 'success') throw new Error('复制已取消');
       })
     }});
-  } catch (_) { /* Callers can use DewuBridge.copyText directly. */ }
+  } catch (_) { /* 调用方也可以直接使用 BoluoBridge.copyText。 */ }
 })();

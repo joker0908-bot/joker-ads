@@ -9,44 +9,54 @@
 }
 
 :root {
-  /* 得污 v3 · 哑光墨黑 + LOGO 青弧带（克制，不霓虹） */
-  --dw-ink: #050607;
-  --dw-bg: #090b0e;
-  --dw-surface: #11151b;
-  --dw-surface-2: #171c24;
-  --dw-elevated: #1b222c;
-  --dw-cyan: #00c8e8;
-  --dw-cyan-soft: #4ddcf5;
-  --dw-cyan-deep: #0098b5;
-  --dw-cyan-dim: rgba(0, 200, 232, 0.1);
-  --dw-cyan-glow: rgba(0, 200, 232, 0.22);
-  --dw-line: rgba(0, 200, 232, 0.16);
-  --dw-hair: rgba(255, 255, 255, 0.06);
-  --dw-text: #eef2f6;
-  --dw-muted: rgba(238, 242, 246, 0.52);
-  --dw-faint: rgba(238, 242, 246, 0.3);
-  --dw-ink-on-cyan: #041016;
-  --dw-notice: #ff7a94;
-  --dw-radius-sm: 0.12rem;
-  --dw-radius: 0.2rem;
-  --dw-radius-lg: 0.36rem;
-  --dw-pad-x: 0.36rem;
-  --dw-font: 'Sora', 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
-  --dw-tabbar-h: 1.53846rem;
-  --dw-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  /* 菠萝视频 · 全息赛博菠萝。页面只消费这些 token。 */
+  --bl-ink: #07040f;
+  --bl-bg: #0b0716;
+  --bl-bg-deep: #140c26;
+  --bl-surface: #160e28;
+  --bl-surface-2: #1e1434;
+  --bl-elevated: #271845;
+  --bl-gold: #ffe56a;
+  --bl-magenta: #ff4fd8;
+  --bl-violet: #8a5cff;
+  --bl-blue: #4c8dff;
+  --bl-accent: #ffe56a;
+  --bl-accent-soft: #ffd6f6;
+  --bl-accent-deep: #c026d3;
+  --bl-neon: #ff4fd8;
+  --bl-accent-dim: rgba(255, 79, 216, 0.14);
+  --bl-glow: rgba(255, 79, 216, 0.45);
+  --bl-line: rgba(186, 130, 255, 0.34);
+  --bl-hair: rgba(196, 150, 255, 0.18);
+  --bl-text: #f7f3ff;
+  --bl-muted: rgba(247, 243, 255, 0.66);
+  --bl-faint: rgba(247, 243, 255, 0.4);
+  --bl-on-accent: #1a0b16;
+  --bl-notice: #ff8ad4;
+  --bl-grad: linear-gradient(115deg, #ffe56a 0%, #ff4fd8 42%, #8a5cff 72%, #4c8dff 100%);
+  --bl-grad-soft: linear-gradient(135deg, rgba(255, 229, 106, 0.2), rgba(255, 79, 216, 0.16) 48%, rgba(76, 141, 255, 0.18));
+  --bl-glow-shadow: 0 0 0 1px rgba(255, 229, 106, 0.45), 0 0 16px rgba(255, 79, 216, 0.48), 0 0 28px rgba(76, 141, 255, 0.28);
+  --bl-radius-sm: 0.12rem;
+  --bl-radius: 0.2rem;
+  --bl-radius-lg: 0.36rem;
+  --bl-pad-x: 0.36rem;
+  --bl-font: 'Sora', 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  --bl-tabbar-h: 1.53846rem;
+  --bl-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --bl-hex: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='56' height='98' viewBox='0 0 56 98'><g fill='none' stroke='%23c9a6ff' stroke-opacity='0.22' stroke-width='1'><path d='M28 1.5 53 16v29L28 59.5 3 45V16Z'/><path d='M28 50.5 53 65v29L28 108.5 3 94V65Z'/></g></svg>");
 }
 
 html {
-  background-color: var(--dw-ink);
+  background-color: var(--bl-ink);
   height: 100%;
   -webkit-text-size-adjust: 100%;
 }
 
 body {
   margin: 0;
-  font-family: var(--dw-font);
-  background-color: var(--dw-bg);
-  color: var(--dw-text);
+  font-family: var(--bl-font);
+  background-color: var(--bl-bg);
+  color: var(--bl-text);
   min-height: 100%;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
@@ -58,21 +68,29 @@ body {
   min-height: 100vh;
   margin: 0 auto;
   position: relative;
-  background: var(--dw-bg);
+  background-color: var(--bl-bg);
+  background-image:
+    radial-gradient(ellipse 90% 42% at 50% -10%, rgba(138, 92, 255, 0.32), transparent 62%),
+    radial-gradient(ellipse 46% 28% at 100% 0%, rgba(255, 79, 216, 0.16), transparent 55%),
+    radial-gradient(ellipse 40% 24% at 0% 12%, rgba(255, 229, 106, 0.08), transparent 50%),
+    var(--bl-hex);
+  background-size: auto, auto, auto, 56px 98px;
   overflow-x: hidden;
 }
 
 html[data-shell='desktop'] #app {
   max-width: 460px;
   box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 0 0 1px rgba(255, 79, 216, 0.22),
     0 24px 80px rgba(0, 0, 0, 0.55);
 }
 
 html[data-shell='desktop'] body {
   max-width: 460px;
   margin: 0 auto;
-  background: #020304;
+  background:
+    radial-gradient(ellipse 60% 40% at 50% 0%, rgba(138, 92, 255, 0.2), transparent 70%),
+    #05030c;
 }
 
 html[data-shell='desktop'] .popup-overlay {
@@ -88,11 +106,11 @@ html[data-shell='desktop'] .tabbar {
   right: auto;
   transform: translateX(-50%);
   width: 100%;
-  height: var(--dw-tabbar-h);
+  height: var(--bl-tabbar-h);
 }
 
 html[data-shell='desktop'] {
-  --dw-tabbar-h: 60px;
+  --bl-tabbar-h: 60px;
 }
 
 html[data-shell='desktop'] .float-banner {
@@ -133,31 +151,33 @@ img {
   display: none;
 }
 
-/* Shared primitives */
-.dw-btn {
-  background: var(--dw-cyan);
+.bl-btn {
+  background: var(--bl-grad);
   border: none;
   border-radius: 999px;
-  color: var(--dw-ink-on-cyan);
+  box-shadow: var(--bl-glow-shadow);
+  color: var(--bl-on-accent);
   font-size: 0.28rem;
   font-weight: 700;
   letter-spacing: 0.02em;
   padding: 0.14rem 0.28rem;
 }
 
-.dw-btn--ghost {
-  background: var(--dw-cyan-dim);
-  border: 1px solid var(--dw-line);
-  color: var(--dw-cyan-soft);
+.bl-btn--ghost {
+  background: var(--bl-accent-dim);
+  border: 1px solid var(--bl-line);
+  box-shadow: none;
+  color: var(--bl-accent-soft);
 }
 
-.dw-panel {
-  background: var(--dw-surface);
-  border: 1px solid var(--dw-hair);
-  border-radius: var(--dw-radius);
+.bl-panel {
+  background: var(--bl-surface);
+  border: 1px solid var(--bl-line);
+  border-radius: var(--bl-radius);
+  box-shadow: 0 0 0 1px rgba(255, 79, 216, 0.08), 0 12px 36px rgba(5, 0, 16, 0.35);
 }
 
-.dw-section-title {
+.bl-section-title {
   align-items: center;
   display: flex;
   font-size: 0.32rem;
@@ -166,9 +186,10 @@ img {
   letter-spacing: 0.04em;
 }
 
-.dw-section-title::before {
-  background: var(--dw-cyan);
+.bl-section-title::before {
+  background: var(--bl-grad);
   border-radius: 2px;
+  box-shadow: 0 0 10px rgba(255, 79, 216, 0.65);
   content: '';
   flex-shrink: 0;
   height: 0.28rem;

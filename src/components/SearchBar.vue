@@ -32,12 +32,12 @@ function onClick() {
 <style scoped>
 .search-bar {
   align-items: center;
-  background: var(--dw-surface);
-  border: 1px solid var(--dw-hair);
+  background: var(--bl-surface);
+  border: 1px solid var(--bl-hair);
   border-radius: 999px;
   display: flex;
   gap: 0.16rem;
-  margin: 0.2rem var(--dw-pad-x);
+  margin: 0.2rem var(--bl-pad-x);
   padding: 0.14rem 0.24rem;
 }
 .search-bar--tap {

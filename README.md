@@ -17,9 +17,9 @@
 2. **管理后台**：Node 服务（`admin/server.mjs`）+ 独立静态管理界面（`admin/public/`），用于维护站点配置、标签页、弹窗、广告位与应用投放，采用 draft / live 双份 JSON 数据与原子发布。
 3. **采集与验证工具链**：`scripts/` 下的爬虫（网络拦截 + DOM 抓取 + 资源落盘）、API 会话同步、审计门禁与发布脚本；产物集中落在 `crawled/`。
 
-配套还有 **Android 壳工程**（`android/`，包名 `cn.b12sl5x.dewu`），把线上站点包进原生 WebView，并附带原生请求策略、URL 策略与单元测试。
+配套还有 **Android 壳工程**（`android/`，包名 `cn.b12sl5x.boluo`），把线上站点包进原生 WebView，并附带原生请求策略、URL 策略与单元测试。旧安装包不兼容，需要重新安装。
 
-**服务对象**：站点运营者（通过管理后台改配置、发广告位、看反馈）与站点访客（浏览应用中心、观看视频、使用充值/支付与广告落地页链路）。项目品牌名为 **得污**。
+**服务对象**：站点运营者（通过管理后台改配置、发广告位、看反馈）与站点访客（浏览应用中心、观看视频、使用充值/支付与广告落地页链路）。项目品牌名为 **菠萝视频**（拼音 boluo）。旧品牌对照见 [deploy/BRAND-MIGRATION.md](deploy/BRAND-MIGRATION.md)。
 
 > 说明：仓库根目录的 `src/`、`scripts/`、`deploy/` 被 `package.json` 与两个 GitHub Actions 工作流大量引用，但未出现在本次档案所提供的目录清单中，其内部文件级结构**暂无登记**，本文按脚本名与工作流调用点描述其职责。
 
@@ -76,9 +76,9 @@
 
 | 模块 | 说明 | 证据 |
 |---|---|---|
-| WebView 主界面 | 加载线上站点的原生界面 | `android/app/src/main/java/cn/b12sl5x/dewu/MainActivity.java` |
-| 原生请求策略 | 请求策略控制与单元测试 | `android/app/src/main/java/cn/b12sl5x/dewu/NativeRequestPolicy.java`、`android/app/src/test/java/cn/b12sl5x/dewu/NativeRequestPolicyTest.java` |
-| URL 策略 | URL 白名单/放行策略与单元测试 | `android/app/src/main/java/cn/b12sl5x/dewu/UrlPolicy.java`、`android/app/src/test/java/cn/b12sl5x/dewu/UrlPolicyTest.java` |
+| WebView 主界面 | 加载线上站点的原生界面 | `android/app/src/main/java/cn/b12sl5x/boluo/MainActivity.java` |
+| 原生请求策略 | 请求策略控制与单元测试 | `android/app/src/main/java/cn/b12sl5x/boluo/NativeRequestPolicy.java`、`android/app/src/test/java/cn/b12sl5x/boluo/NativeRequestPolicyTest.java` |
+| URL 策略 | URL 白名单/放行策略与单元测试 | `android/app/src/main/java/cn/b12sl5x/boluo/UrlPolicy.java`、`android/app/src/test/java/cn/b12sl5x/boluo/UrlPolicyTest.java` |
 | 原生桥脚本 | 注入 WebView 的桥接脚本 | `android/app/src/main/assets/native-bridge.js` |
 | 网络安全配置 | 明文/域名网络安全策略 | `android/app/src/main/res/xml/network_security_config.xml` |
 | 数据提取规则 | 备份/提取规则 | `android/app/src/main/res/xml/data_extraction_rules.xml` |
@@ -108,7 +108,7 @@
 ```
 ┌──────────────────────────────┐        ┌──────────────────────────────┐
 │  前端站点 (Vue 3 + Vite)      │        │  Android 壳 (WebView)         │
-│  https://b12sl5x.cn/          │◀──────▶│  cn.b12sl5x.dewu              │
+│  https://b12sl5x.cn/          │◀──────▶│  cn.b12sl5x.boluo              │
 └──────────────┬───────────────┘        └──────────────────────────────┘
                │ 读 live 配置 / 广告位
                ▼
@@ -177,7 +177,7 @@
 | 复刻启动 | `12e7c44` → `d42abfa` | 修复应用中心假 VIP 弹窗、去掉假弹窗兜底、整宽 rem 布局、移动/桌面外壳尺寸对齐原站（430px / 460px@48px rem） |
 | 1:1 基线与审计 | `ec3ae79`、`eea65a6`、`f894f04`、`65514ef` | 完成 1:1 克隆与 live API 层、审计门禁；顺序弹窗与原站封面；精品APP 网格弹窗；精选视频双列 |
 | 对齐与加固 | `9bf0b44`、`cc9e246`、`7ced643`、`2761c2a`、`c21f0ea`、`da8c878`、`b866fd4` | 对齐 featured/douyin/dark 视频接口；P1 圈层/番剧分页/每 tab 缓存；P2 UI 打磨；播放改走 `al-ads` 代理绕开源站 IP 封禁并固定上游 IP；P0 克隆缺口修复 |
-| 支付与广告 | `fae23eb`、`ef874a8`、`4140bd2`、`239cbbc`、`4124bc0`、`258a2fa` | 接入 Najin 8002/8009 QR 支付；二维码框选 https checkout；广告直接开落地页；我的页控件全部可用；品牌化「得污」；移除暗黑与圈层模块 |
+| 支付与广告 | `fae23eb`、`ef874a8`、`4140bd2`、`239cbbc`、`4124bc0`、`258a2fa` | 接入 Najin 8002/8009 QR 支付；二维码框选 https checkout；广告直接开落地页；我的页控件全部可用；完成当时的品牌统一（旧名见 deploy/BRAND-MIGRATION.md）；移除暗黑与圈层模块 |
 | 部署迁移 | `fffb6e0`、`750eed3`、`3ba98ee`、`22e7e8a`、`7994300`、`445fdab`、`505cd35` | 修正部署文档；新增前端迁移 vhost；Pages 改为从分支发布；分类 tab feed 与视频池；文档化视频池刷新；`sid` 头 CORS 放行；播放/搜索/抖音加固 + 管理后台 + 业务 TG |
 | 生产基线 | `bea3d2d`、`4212a90`、`ce0d930`、`3352412`、`5e7cf6b`、`18480ee`、`108f189` | 迁移到 VPS 生产基线并移除旧导航 tab；保留可复现入口资产；签名服务器 Android 打包 + 生产 CI；发布广告同步补丁；升级 Node 24 / 脱离 Node 20 |
 | 安全与稳定性 | `cbdbdc0`、`a7f508f`、`d129820`、`e70b553`、`1637a9b`、`0e7c02e`、`f1b8653` | 修复支付创建与鉴权漏洞 + manifest 校验部署；原子发布校验通过的站点包并接线广告位；广告点击归因、播放器代次隔离、Android 结果回执；拒绝默认引导口令、退役不安全发布；请求有界与播放失败归属；广告刷新对齐；后台变更发布并同步前端 |
@@ -190,7 +190,7 @@
 | 决策 | 变更内容 | 原因 / 说明 | 证据 |
 |---|---|---|---|
 | 模块裁剪 | 移除暗黑与圈层模块 | 与最终产品形态不符 | git `258a2fa` Remove the dark and circle modules |
-| 品牌更名 | 应用品牌定为「得污」并修复促销 banner | 品牌统一与 UI 修复 | git `4124bc0` |
+| 品牌更名 | 应用品牌统一为菠萝视频，并修复促销 banner | 品牌统一与 UI 修复；更早的旧名只记在 deploy/BRAND-MIGRATION.md | git `4124bc0` |
 | 播放链路 | 播放改走 `al-ads` API 代理，固定上游 IP、去重 CORS | 源站对出口 IP 封禁，需代理绕行 | git `c21f0ea`、`da8c878` |
 | 广告跳转 | 从「点击追踪端点」改为「直接打开广告主落地页」 | 用户应直接到达落地页，追踪与落地解耦 | git `4140bd2` |
 | 发布方式 | GitHub Pages 由 Actions 改为从分支发布；随后整体迁入 VPS 成为唯一生产 | 强化可复现与可控的生产基线 | git `3ba98ee`、`bea3d2d`、`4212a90` |
@@ -283,7 +283,7 @@ gradle -p android --no-daemon assembleRelease assembleDebug testDebugUnitTest li
   7. `actions/setup-java@v4`（Temurin JDK 17）
   8. `gradle/actions/setup-gradle@v4`（Gradle 8.11.1）
   9. `gradle -p android --no-daemon assembleRelease assembleDebug testDebugUnitTest lintRelease`
-  10. 上传 `dewu-unsigned-apk`（release unsigned APK）与 `dewu-debug-acceptance-apk`（debug APK），缺失即失败（`if-no-files-found: error`）
+  10. 上传 `boluo-unsigned-apk`（release unsigned APK）与 `boluo-debug-acceptance-apk`（debug APK），缺失即失败（`if-no-files-found: error`）
 
 ### 7.2 生产部署工作流 `.github/workflows/deploy-production.yml`
 

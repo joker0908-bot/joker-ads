@@ -6,10 +6,10 @@ function browser(origin = 'https://b12sl5x.cn', mainFrame = true) {
   const messages = [], native = { postMessage: text => messages.push(JSON.parse(text)) }, timers = new Map()
   let timerId = 0
   class Anchor { constructor(href, download = '') { this.href = href; this.download = download; this.clicks = 0 } click() { this.clicks++ } }
-  const window = { DewuNative: native }
+  const window = { BoluoNative: native }
   window.top = mainFrame ? window : {}
   const listeners = []
-  const context = vm.createContext({ window, location: { origin }, DewuNative: native, navigator: {}, HTMLAnchorElement: Anchor,
+  const context = vm.createContext({ window, location: { origin }, BoluoNative: native, navigator: {}, HTMLAnchorElement: Anchor,
     setTimeout: (fn, delay) => { timers.set(++timerId, { fn, delay }); return timerId }, clearTimeout: id => timers.delete(id),
     document: { addEventListener: (name, callback) => listeners.push(callback) } })
   return { context, Anchor, messages, listeners, timers, reply: data => native.onmessage({ data: JSON.stringify(data) }) }
@@ -43,15 +43,15 @@ await assert.rejects(timedOut, /超时/)
 live.reply({ id: live.messages.at(-1).id, status: 'success' }) // Late acknowledgements are ignored.
 let saved = false
 const image = 'data:image/png;base64,iVBORw0KGgo='
-const save = live.context.window.DewuBridge.saveImage(image, '123.png').then(result => { saved = true; return result })
+const save = live.context.window.BoluoBridge.saveImage(image, '123.png').then(result => { saved = true; return result })
 await Promise.resolve()
 assert.equal(saved, false)
 live.reply({ id: live.messages.at(-1).id, status: 'cancelled' })
 assert.equal((await save).status, 'cancelled')
-const failedSave = live.context.window.DewuBridge.saveImage(image, '123.png')
+const failedSave = live.context.window.BoluoBridge.saveImage(image, '123.png')
 live.reply({ id: live.messages.at(-1).id, status: 'error', error: 'WRITE_FAILED' })
 await assert.rejects(failedSave, /WRITE_FAILED/)
-const successSave = live.context.window.DewuBridge.saveImage(image, '123.png')
+const successSave = live.context.window.BoluoBridge.saveImage(image, '123.png')
 live.reply({ id: live.messages.at(-1).id, status: 'success' })
 assert.equal((await successSave).status, 'success')
 const anchor = new live.Anchor(image, '123.png')

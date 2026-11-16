@@ -32,11 +32,11 @@ jobs:
         run: gradle -p android --no-daemon assembleRelease assembleDebug testDebugUnitTest lintRelease
       - uses: actions/upload-artifact@v7
         with:
-          name: dewu-unsigned-apk
+          name: boluo-unsigned-apk
           path: android/app/build/outputs/apk/release/app-release-unsigned.apk
           if-no-files-found: error
       - uses: actions/upload-artifact@v7
         with:
-          name: dewu-debug-acceptance-apk
+          name: boluo-debug-acceptance-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

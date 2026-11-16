@@ -193,7 +193,7 @@ onBeforeUnmount(() => { ++loadSeq; loadController?.abort(); destroyPlayer() })
 
 <style scoped>
 .play {
-  background: var(--dw-bg);
+  background: var(--bl-bg);
   min-height: 100vh;
   padding-bottom: 0.4rem;
 }
@@ -204,10 +204,10 @@ onBeforeUnmount(() => { ++loadSeq; loadController?.abort(); destroyPlayer() })
   padding: 0.16rem 0.24rem;
 }
 .play__back {
-  background: var(--dw-cyan-dim);
-  border: 1px solid var(--dw-line);
+  background: var(--bl-accent-dim);
+  border: 1px solid var(--bl-line);
   border-radius: 50%;
-  color: var(--dw-cyan-soft);
+  color: var(--bl-accent-soft);
   font-size: 0.48rem;
   height: 0.72rem;
   line-height: 0.64rem;
@@ -258,7 +258,7 @@ onBeforeUnmount(() => { ++loadSeq; loadController?.abort(); destroyPlayer() })
   background: rgba(0, 212, 255, 0.1);
   border: 1px solid rgba(0, 212, 255, 0.22);
   border-radius: 0.1rem;
-  color: var(--dw-cyan-soft);
+  color: var(--bl-accent-soft);
   font-size: 0.26rem;
   margin-top: 0.16rem;
   padding: 0.12rem 0.16rem;
@@ -270,10 +270,10 @@ onBeforeUnmount(() => { ++loadSeq; loadController?.abort(); destroyPlayer() })
   margin-top: 0.16rem;
 }
 .play__tags span {
-  background: var(--dw-surface-2);
+  background: var(--bl-surface-2);
   border: 1px solid rgba(0, 212, 255, 0.12);
   border-radius: 0.8rem;
-  color: var(--dw-muted);
+  color: var(--bl-muted);
   font-size: 0.24rem;
   padding: 0.08rem 0.18rem;
 }
@@ -296,7 +296,7 @@ onBeforeUnmount(() => { ++loadSeq; loadController?.abort(); destroyPlayer() })
 }
 .more-card__cover {
   aspect-ratio: 16 / 10;
-  background: var(--dw-surface);
+  background: var(--bl-surface);
   border-radius: 0.1rem;
   display: block;
   overflow: hidden;

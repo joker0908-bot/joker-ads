@@ -304,7 +304,7 @@ onBeforeUnmount(() => stopPoll())
 
 <style scoped>
 .recharge {
-  background: radial-gradient(ellipse 100% 28% at 50% 0%, rgba(0,212,255,0.07), transparent 60%), var(--dw-bg);
+  background: radial-gradient(ellipse 100% 28% at 50% 0%, rgba(0,212,255,0.07), transparent 60%), var(--bl-bg);
   color: #fff;
   min-height: 100vh;
   padding: 0 0.32rem 0.8rem;
@@ -316,10 +316,10 @@ onBeforeUnmount(() => stopPoll())
   padding: 0.24rem 0 0.32rem;
 }
 .recharge__back {
-  background: var(--dw-cyan-dim);
-  border: 1px solid var(--dw-line);
+  background: var(--bl-accent-dim);
+  border: 1px solid var(--bl-line);
   border-radius: 50%;
-  color: var(--dw-cyan-soft);
+  color: var(--bl-accent-soft);
   font-size: 0.48rem;
   height: 0.72rem;
   line-height: 0.64rem;
@@ -329,7 +329,7 @@ onBeforeUnmount(() => stopPoll())
 .recharge__head h1 { font-size: 0.36rem; font-weight: 600; letter-spacing: 0.04em; }
 .recharge__tabs { display: flex; gap: 0.16rem; margin-bottom: 0.24rem; }
 .recharge__tab {
-  background: var(--dw-surface-2);
+  background: var(--bl-surface-2);
   border: none;
   border-radius: 0.8rem;
   color: rgba(255, 255, 255, 0.65);
@@ -337,7 +337,7 @@ onBeforeUnmount(() => stopPoll())
   font-size: 0.3rem;
   padding: 0.16rem;
 }
-.recharge__tab.is-active { background: var(--dw-cyan); color: #061018; font-weight: 700; }
+.recharge__tab.is-active { background: var(--bl-grad); box-shadow: var(--bl-glow-shadow); color: #140C26; font-weight: 700; }
 .recharge__hint { color: rgba(255, 255, 255, 0.55); font-size: 0.26rem; margin-bottom: 0.16rem; }
 .recharge__hint--err { color: #ff8a8a; }
 .pkg-grid {
@@ -347,7 +347,7 @@ onBeforeUnmount(() => stopPoll())
   margin-bottom: 0.32rem;
 }
 .pkg {
-  background: var(--dw-surface);
+  background: var(--bl-surface);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 0.16rem;
   color: inherit;
@@ -357,14 +357,14 @@ onBeforeUnmount(() => stopPoll())
   padding: 0.24rem 0.16rem;
   text-align: center;
 }
-.pkg.is-active { border-color: var(--dw-cyan); box-shadow: 0 0 0 1px var(--dw-cyan) inset; }
+.pkg.is-active { border-color: var(--bl-accent); box-shadow: 0 0 0 1px var(--bl-accent) inset; }
 .pkg strong { font-size: 0.28rem; }
-.pkg__price { color: var(--dw-cyan-soft); font-size: 0.34rem; font-weight: 700; }
+.pkg__price { color: var(--bl-accent-soft); font-size: 0.34rem; font-weight: 700; }
 .pkg__tip { color: rgba(255, 255, 255, 0.45); font-size: 0.22rem; }
 .pay-types h3 { font-size: 0.32rem; margin-bottom: 0.12rem; }
 .pay-types { margin-bottom: 0.32rem; }
 .pay-type {
-  background: var(--dw-surface-2);
+  background: var(--bl-surface-2);
   border: 1px solid transparent;
   border-radius: 0.12rem;
   color: #fff;
@@ -375,14 +375,14 @@ onBeforeUnmount(() => stopPoll())
   padding: 0.14rem 0.24rem;
   text-align: left;
 }
-.pay-type.is-active { border-color: var(--dw-cyan); color: var(--dw-cyan); }
+.pay-type.is-active { border-color: var(--bl-accent); color: var(--bl-accent); }
 .pay-type.is-disabled { opacity: 0.35; }
 .pay-type__range { color: rgba(255,255,255,.45); font-size: 0.22rem; margin-top: 0.04rem; }
 .recharge__submit {
-  background: var(--dw-cyan);
+  background: var(--bl-grad); box-shadow: var(--bl-glow-shadow);
   border: none;
   border-radius: 0.8rem;
-  color: #061018;
+  color: #140C26;
   font-size: 0.34rem;
   font-weight: 700;
   padding: 0.24rem;
@@ -406,8 +406,8 @@ onBeforeUnmount(() => stopPoll())
   z-index: 1000;
 }
 .pay-modal__box {
-  background: var(--dw-surface);
-  border: 1px solid var(--dw-line);
+  background: var(--bl-surface);
+  border: 1px solid var(--bl-line);
   border-radius: 0.2rem;
   max-width: 420px;
   padding: 0.28rem;
@@ -463,7 +463,7 @@ onBeforeUnmount(() => stopPoll())
   margin-top: 0.2rem;
 }
 .pay-modal__btn {
-  background: var(--dw-surface-2);
+  background: var(--bl-surface-2);
   border: none;
   border-radius: 0.8rem;
   color: #fff;
@@ -471,5 +471,5 @@ onBeforeUnmount(() => stopPoll())
   font-size: 0.28rem;
   padding: 0.16rem;
 }
-.pay-modal__btn--primary { background: var(--dw-cyan); color: #061018; font-weight: 700; }
+.pay-modal__btn--primary { background: var(--bl-grad); box-shadow: var(--bl-glow-shadow); color: #140C26; font-weight: 700; }
 </style>

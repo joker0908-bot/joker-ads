@@ -150,8 +150,8 @@ const row2 = computed(() => (siteConfig.tabs.mine?.quickApps || []).slice(6))
 const recommend = computed(() => [...new Set(config.value.categoryApps?.byCategory?.['官方推荐'] || [])].map(resolveApp).filter(Boolean).slice(0, 5))
 
 const avatarText = computed(() => {
-  const n = String(user.value.name || '得污').trim()
-  return n.slice(0, 1) || '污'
+  const n = String(user.value.name || '菠萝视频').trim()
+  return n.slice(0, 1) || '菠'
 })
 
 function openApp(app, slot = 'mineQuickApps') {
@@ -214,14 +214,14 @@ onMounted(() => {
 <style scoped>
 .profile {
   background:
-    radial-gradient(ellipse 80% 70% at 12% 0%, rgba(0, 200, 232, 0.1), transparent 55%),
-    linear-gradient(180deg, #0c1016 0%, var(--dw-bg) 100%);
+    radial-gradient(ellipse 80% 70% at 12% 0%, rgba(255, 79, 216, 0.12), transparent 55%),
+    linear-gradient(180deg, #140C26 0%, var(--bl-bg) 100%);
   overflow: hidden;
-  padding: 0.32rem var(--dw-pad-x) 0.24rem;
+  padding: 0.32rem var(--bl-pad-x) 0.24rem;
   position: relative;
 }
 .profile__glow {
-  background: linear-gradient(90deg, transparent, var(--dw-cyan), transparent);
+  background: linear-gradient(90deg, transparent, var(--bl-accent), transparent);
   bottom: 0;
   height: 1px;
   left: 12%;
@@ -238,17 +238,17 @@ onMounted(() => {
 }
 .id {
   align-items: center;
-  color: var(--dw-muted);
+  color: var(--bl-muted);
   display: flex;
   font-size: 0.24rem;
   gap: 0.1rem;
   letter-spacing: 0.02em;
 }
 .id__copy {
-  background: var(--dw-surface);
-  border: 1px solid var(--dw-hair);
+  background: var(--bl-surface);
+  border: 1px solid var(--bl-hair);
   border-radius: 999px;
-  color: var(--dw-muted);
+  color: var(--bl-muted);
   font-size: 0.22rem;
   padding: 0.05rem 0.14rem;
 }
@@ -257,10 +257,10 @@ onMounted(() => {
   gap: 0.08rem;
 }
 .profile__tools button {
-  background: var(--dw-surface);
-  border: 1px solid var(--dw-hair);
+  background: var(--bl-surface);
+  border: 1px solid var(--bl-hair);
   border-radius: 999px;
-  color: var(--dw-muted);
+  color: var(--bl-muted);
   font-size: 0.22rem;
   padding: 0.08rem 0.14rem;
 }
@@ -276,9 +276,9 @@ onMounted(() => {
 }
 .avatar {
   align-items: center;
-  background: var(--dw-cyan);
+  background: var(--bl-grad); box-shadow: var(--bl-glow-shadow);
   border-radius: 50%;
-  color: var(--dw-ink-on-cyan);
+  color: var(--bl-on-accent);
   display: flex;
   font-size: 0.48rem;
   font-weight: 700;
@@ -292,16 +292,16 @@ onMounted(() => {
   letter-spacing: 0.04em;
 }
 .bio {
-  color: var(--dw-muted);
+  color: var(--bl-muted);
   font-size: 0.26rem;
   margin-top: 0.08rem;
 }
 .bind-btn {
   align-items: center;
-  background: var(--dw-surface);
-  border: 1px solid var(--dw-line);
+  background: var(--bl-surface);
+  border: 1px solid var(--bl-line);
   border-radius: 999px;
-  color: var(--dw-text);
+  color: var(--bl-text);
   display: flex;
   font-size: 0.28rem;
   font-weight: 600;
@@ -311,7 +311,7 @@ onMounted(() => {
   width: 100%;
 }
 .bind-btn em {
-  color: var(--dw-cyan);
+  color: var(--bl-accent);
   font-style: normal;
   font-size: 0.24rem;
   font-weight: 700;
@@ -328,28 +328,28 @@ onMounted(() => {
   font-weight: 700;
 }
 .stats span {
-  color: var(--dw-muted);
+  color: var(--bl-muted);
   font-size: 0.24rem;
 }
 .pay-row {
   display: flex;
   gap: 0.14rem;
-  padding: 0.24rem var(--dw-pad-x) 0;
+  padding: 0.24rem var(--bl-pad-x) 0;
 }
 .pay-card {
-  background: var(--dw-surface);
-  border: 1px solid var(--dw-hair);
-  border-radius: var(--dw-radius);
+  background: var(--bl-surface);
+  border: 1px solid var(--bl-hair);
+  border-radius: var(--bl-radius);
   flex: 1;
   padding: 0.24rem;
 }
 .pay-card--vip {
   background:
-    linear-gradient(160deg, rgba(0, 200, 232, 0.1), transparent 55%),
-    var(--dw-surface);
+    linear-gradient(160deg, rgba(255, 79, 216, 0.12), transparent 55%),
+    var(--bl-surface);
 }
 .pay-card__eyebrow {
-  color: var(--dw-cyan);
+  color: var(--bl-accent);
   display: block;
   font-size: 0.18rem;
   font-weight: 700;
@@ -361,42 +361,42 @@ onMounted(() => {
   font-size: 0.3rem;
 }
 .pay-card p {
-  color: var(--dw-muted);
+  color: var(--bl-muted);
   font-size: 0.22rem;
   margin: 0.1rem 0 0.18rem;
 }
 .pay-card button {
-  background: var(--dw-cyan);
+  background: var(--bl-grad); box-shadow: var(--bl-glow-shadow);
   border: none;
   border-radius: 999px;
-  color: var(--dw-ink-on-cyan);
+  color: var(--bl-on-accent);
   font-size: 0.24rem;
   font-weight: 700;
   padding: 0.1rem 0.18rem;
 }
 .task-card {
   align-items: center;
-  background: var(--dw-surface);
-  border: 1px solid var(--dw-hair);
-  border-radius: var(--dw-radius);
+  background: var(--bl-surface);
+  border: 1px solid var(--bl-hair);
+  border-radius: var(--bl-radius);
   cursor: pointer;
   display: flex;
   justify-content: space-between;
-  margin: 0.2rem var(--dw-pad-x) 0;
+  margin: 0.2rem var(--bl-pad-x) 0;
   padding: 0.24rem 0.28rem;
 }
 .task-card strong {
   font-size: 0.32rem;
 }
 .task-card p {
-  color: var(--dw-muted);
+  color: var(--bl-muted);
   font-size: 0.24rem;
   margin-top: 0.06rem;
 }
 .task-card__go {
-  background: var(--dw-cyan);
+  background: var(--bl-grad); box-shadow: var(--bl-glow-shadow);
   border-radius: 999px;
-  color: var(--dw-ink-on-cyan);
+  color: var(--bl-on-accent);
   font-size: 0.26rem;
   font-weight: 700;
   padding: 0.1rem 0.22rem;
@@ -404,13 +404,13 @@ onMounted(() => {
 .feature-row {
   display: flex;
   gap: 0.12rem;
-  padding: 0.2rem var(--dw-pad-x) 0;
+  padding: 0.2rem var(--bl-pad-x) 0;
 }
 .feature {
-  background: var(--dw-surface);
-  border: 1px solid var(--dw-hair);
-  border-radius: var(--dw-radius);
-  color: var(--dw-text);
+  background: var(--bl-surface);
+  border: 1px solid var(--bl-hair);
+  border-radius: var(--bl-radius);
+  color: var(--bl-text);
   flex: 1;
   padding: 0.22rem 0.14rem;
   text-align: left;
@@ -420,13 +420,13 @@ onMounted(() => {
   font-size: 0.26rem;
 }
 .feature span {
-  color: var(--dw-muted);
+  color: var(--bl-muted);
   display: block;
   font-size: 0.2rem;
   margin-top: 0.08rem;
 }
 .panel {
-  padding: 0.36rem var(--dw-pad-x) 0.04rem;
+  padding: 0.36rem var(--bl-pad-x) 0.04rem;
 }
 .panel__head {
   align-items: center;
@@ -443,7 +443,7 @@ onMounted(() => {
   letter-spacing: 0.04em;
 }
 .panel__head h3::before {
-  background: var(--dw-cyan);
+  background: var(--bl-grad); box-shadow: var(--bl-glow-shadow);
   border-radius: 2px;
   content: '';
   height: 0.28rem;
@@ -452,7 +452,7 @@ onMounted(() => {
 .panel__more {
   background: none;
   border: none;
-  color: var(--dw-cyan);
+  color: var(--bl-accent);
   font-size: 0.26rem;
 }
 .quick-grid {
@@ -470,7 +470,7 @@ onMounted(() => {
   align-items: center;
   background: none;
   border: none;
-  color: var(--dw-muted);
+  color: var(--bl-muted);
   display: flex;
   flex-direction: column;
   font-size: 0.22rem;
@@ -480,7 +480,7 @@ onMounted(() => {
 }
 .quick-app__img {
   aspect-ratio: 1;
-  border: 1px solid var(--dw-hair);
+  border: 1px solid var(--bl-hair);
   border-radius: 0.24rem;
   height: auto;
   margin: 0 auto;
@@ -490,8 +490,8 @@ onMounted(() => {
 }
 .quick-app__img--ph {
   align-items: center;
-  background: var(--dw-surface-2);
-  color: var(--dw-text);
+  background: var(--bl-surface-2);
+  color: var(--bl-text);
   display: flex;
   font-size: 0.26rem;
   font-weight: 700;
@@ -511,22 +511,22 @@ onMounted(() => {
   grid-template-columns: repeat(3, 1fr);
 }
 .service {
-  background: var(--dw-surface);
-  border: 1px solid var(--dw-hair);
-  border-radius: var(--dw-radius-sm);
-  color: var(--dw-muted);
+  background: var(--bl-surface);
+  border: 1px solid var(--bl-hair);
+  border-radius: var(--bl-radius-sm);
+  color: var(--bl-muted);
   font-size: 0.26rem;
   padding: 0.28rem 0.08rem;
 }
 .service:active {
-  border-color: var(--dw-line);
-  color: var(--dw-cyan-soft);
+  border-color: var(--bl-line);
+  color: var(--bl-accent-soft);
 }
 .version {
-  color: var(--dw-faint);
+  color: var(--bl-faint);
   font-size: 0.22rem;
   letter-spacing: 0.06em;
-  padding: 0.56rem var(--dw-pad-x) 0.9rem;
+  padding: 0.56rem var(--bl-pad-x) 0.9rem;
   text-align: center;
 }
 </style>

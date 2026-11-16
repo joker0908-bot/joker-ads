@@ -38,10 +38,10 @@ export function patchStageThree(code, { exact, functionBody }) {
   for (const name of ['x', 'w']) code = componentFunction(code, 'PlayPage', name, '')
   code = exact(code, 'y0(()=>t.params.id,T),En(m)', 'y0(()=>t.params.id,T),En(()=>{++r;m()})')
   code = exact(code, 'poster:c.value||void 0,onError:h', 'poster:c.value||void 0')
-  code = functionBody(code, 'qn', 'if(window.DewuBridge?.copyText){try{await window.DewuBridge.copyText(String(e));return true}catch{return false}}', true)
+  code = functionBody(code, 'qn', 'if(window.BoluoBridge?.copyText){try{await window.BoluoBridge.copyText(String(e));return true}catch{return false}}', true)
   code = exact(code, "1. 复制链接或邀请码分享给好友，好友下载并注册后即算邀请成功。", "1. 分享本地邀请码或专属链接，邀请关系由身份卡服务记录。")
   code = exact(code, "2. 邀请成功后，双方均可获得会员时长奖励。", "2. 本地奖励尚未接入，不代表会员时长或积分已经到账。")
   code = exact(code, "3. 好友需完成账号绑定，奖励才会到账。", "3. 当前仅展示邀请码、邀请链接和已记录的邀请人数。")
-  code = exact(code, 'y.click(),Ae("已保存，手机可长按相册")', 'window.DewuBridge?.saveImage?(await window.DewuBridge.saveImage(y.href,y.download).then(result=>Ae(result?.status==="cancelled"?"已取消保存":"身份卡已保存")).catch(()=>Ae("保存失败，请重试"))):(y.click(),Ae("已发起下载，请查看系统下载记录"))')
+  code = exact(code, 'y.click(),Ae("已保存，手机可长按相册")', 'window.BoluoBridge?.saveImage?(await window.BoluoBridge.saveImage(y.href,y.download).then(result=>Ae(result?.status==="cancelled"?"已取消保存":"身份卡已保存")).catch(()=>Ae("保存失败，请重试"))):(y.click(),Ae("已发起下载，请查看系统下载记录"))')
   return code
 }
