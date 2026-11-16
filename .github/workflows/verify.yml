@@ -28,6 +28,7 @@ jobs:
           node scripts/test-ad-sync.mjs
           node scripts/test-audit-config.mjs
           node scripts/test-live-routes.mjs
+          node scripts/test-live-migration.mjs
   android:
     name: Android package
     runs-on: [self-hosted, linux, x64]
