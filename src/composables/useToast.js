@@ -14,8 +14,8 @@ export function showToast(message, duration = 2000) {
 }
 
 export async function copyText(text) {
-  if (window.DewuBridge?.copyText) {
-    try { await window.DewuBridge.copyText(String(text)); return true } catch { return false }
+  if (window.BoluoBridge?.copyText) {
+    try { await window.BoluoBridge.copyText(String(text)); return true } catch { return false }
   }
   if (!text) return false
   try {

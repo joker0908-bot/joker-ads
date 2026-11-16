@@ -1,11 +1,11 @@
-package cn.b12sl5x.dewu;
+package cn.b12sl5x.boluo;
 import org.junit.Test;
 import static org.junit.Assert.*;
 public final class NativeRequestPolicyTest {
     @Test public void rejectsOverlongCopyAndInvalidIds() {
         assertTrue(NativeRequestPolicy.canCopy(new String(new char[8192])));
         assertFalse(NativeRequestPolicy.canCopy(new String(new char[8193])));
-        assertTrue(NativeRequestPolicy.validId("dewu-abc-1"));
+        assertTrue(NativeRequestPolicy.validId("boluo-abc-1"));
         assertFalse(NativeRequestPolicy.validId(""));
         assertFalse(NativeRequestPolicy.validId("../escape"));
     }
@@ -18,7 +18,7 @@ public final class NativeRequestPolicyTest {
         assertFalse(NativeRequestPolicy.validPng(new byte[4]));
     }
     @Test public void filenamesCannotEscapeUserSelection() {
-        assertEquals("dewu-card.png", NativeRequestPolicy.safeFilename("../../bad.png"));
+        assertEquals("boluo-card.png", NativeRequestPolicy.safeFilename("../../bad.png"));
         assertEquals("CARD-123.png", NativeRequestPolicy.safeFilename("CARD-123.png"));
     }
 }

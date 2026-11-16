@@ -94,7 +94,7 @@ onMounted(async () => {
 
 <style scoped>
 .balance {
-  background: var(--dw-surface);
+  background: var(--bl-surface);
   border: 1px solid rgba(0, 212, 255, 0.1);
   border-radius: 0.16rem;
   display: grid;
@@ -112,10 +112,10 @@ onMounted(async () => {
   font-size: 0.24rem;
 }
 .signin {
-  background: var(--dw-cyan);
+  background: var(--bl-grad); box-shadow: var(--bl-glow-shadow);
   border: none;
   border-radius: 0.8rem;
-  color: #061018;
+  color: #140C26;
   font-size: 0.32rem;
   font-weight: 700;
   margin-bottom: 0.32rem;
@@ -157,10 +157,10 @@ onMounted(async () => {
   white-space: nowrap;
 }
 .task__go {
-  background: var(--dw-cyan);
+  background: var(--bl-grad); box-shadow: var(--bl-glow-shadow);
   border: none;
   border-radius: 0.8rem;
-  color: #061018;
+  color: #140C26;
   flex-shrink: 0;
   font-size: 0.26rem;
   font-weight: 700;

@@ -29,7 +29,7 @@ export function inviteCodeFromLocation() {
   return ''
 }
 
-export function dewuInviteUrl(inviteCode) {
+export function boluoInviteUrl(inviteCode) {
   const code = inviteCode || customerState.inviteCode
   const base = 'http://okqpkdj.cn/'
   return code ? `${base}?inviteCode=${encodeURIComponent(code)}` : base

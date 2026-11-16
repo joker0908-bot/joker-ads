@@ -177,7 +177,7 @@ try {
     await page.addInitScript(() => {
       sessionStorage.clear()
       window.__nativeMessages = []
-      window.DewuNative = { postMessage: text => window.__nativeMessages.push(JSON.parse(text)) }
+      window.BoluoNative = { postMessage: text => window.__nativeMessages.push(JSON.parse(text)) }
     })
     await page.addInitScript(fs.readFileSync('android/app/src/main/assets/native-bridge.js', 'utf8'))
     await page.goto('https://b12sl5x.cn/')
@@ -208,13 +208,13 @@ try {
     await page.getByRole('button', { name: '复制ID', exact: true }).click()
     await page.waitForFunction(() => window.__nativeMessages.some(message => message.type === 'copy'))
     assert.equal(await page.getByText('ID 已复制', { exact: true }).count(), 0, 'no optimistic copy toast')
-    await page.evaluate(() => { const message = window.__nativeMessages.at(-1); DewuNative.onmessage({ data: JSON.stringify({ id: message.id, status: 'error', error: 'TEXT_TOO_LONG' }) }) })
+    await page.evaluate(() => { const message = window.__nativeMessages.at(-1); BoluoNative.onmessage({ data: JSON.stringify({ id: message.id, status: 'error', error: 'TEXT_TOO_LONG' }) }) })
     await page.getByText('复制失败，请手动选择', { exact: true }).waitFor()
     await page.getByRole('button', { name: '身份卡', exact: false }).click()
     await page.getByRole('button', { name: '截图保存', exact: true }).click()
     await page.waitForFunction(() => window.__nativeMessages.some(message => message.type === 'saveImage'))
     assert.equal(await page.getByText('身份卡已保存', { exact: true }).count(), 0)
-    await page.evaluate(() => { const message = window.__nativeMessages.at(-1); DewuNative.onmessage({ data: JSON.stringify({ id: message.id, status: 'cancelled' }) }) })
+    await page.evaluate(() => { const message = window.__nativeMessages.at(-1); BoluoNative.onmessage({ data: JSON.stringify({ id: message.id, status: 'cancelled' }) }) })
     await page.getByText('已取消保存', { exact: true }).waitFor()
     checks.push('actual frontend plus actual Android JS bridge: copy rejection is failure; save waits; cancel is not success')
     if (process.env.AUDIT_VIDEO) {

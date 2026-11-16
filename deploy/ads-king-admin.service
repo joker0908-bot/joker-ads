@@ -1,5 +1,5 @@
 [Unit]
-Description=Ads King Admin BFF (得污广告后台)
+Description=Ads King Admin BFF (菠萝视频广告后台)
 After=network.target
 
 [Service]

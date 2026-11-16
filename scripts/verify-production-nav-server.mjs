@@ -38,7 +38,7 @@ for (const [mode, port] of [['normal', 4317], ['legacy', 4318], ['failure', 4319
     if (url.pathname === '/data/config.json') {
       if (mode === 'failure') return json({ error: 'intentional QA failure' }, 503)
       const value = structuredClone(config)
-      if (mode === 'legacy') value.tabbar = [{ id: 'invite', label: '得污', icon: 'home' }, ...value.tabbar, { id: 'home', label: '旧首页', icon: 'home' }]
+      if (mode === 'legacy') value.tabbar = [{ id: 'invite', label: '旧入口', icon: 'home' }, ...value.tabbar, { id: 'home', label: '旧首页', icon: 'home' }]
       return json(value)
     }
     if (url.pathname === '/data/tabs.json') return json(tabs)

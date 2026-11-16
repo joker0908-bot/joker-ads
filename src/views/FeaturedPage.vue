@@ -208,10 +208,10 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.featured-ad { display:block; width:calc(100% - .64rem); margin:.24rem .32rem; padding:.24rem; background:var(--dw-surface); color:var(--dw-cyan); border:1px solid var(--dw-line); border-radius:.12rem; text-align:left; }
+.featured-ad { display:block; width:calc(100% - .64rem); margin:.24rem .32rem; padding:.24rem; background:var(--bl-surface); color:var(--bl-accent); border:1px solid var(--bl-line); border-radius:.12rem; text-align:left; }
 .feat-head {
   align-items: center;
-  background: linear-gradient(180deg, #0c1016 0%, transparent);
+  background: linear-gradient(180deg, #140C26 0%, transparent);
   display: flex;
   gap: 0.12rem;
   padding: 0.18rem 0.24rem 0.1rem;
@@ -220,10 +220,10 @@ onMounted(async () => {
 .feat-head__hist,
 .feat-head__plus {
   align-items: center;
-  background: var(--dw-surface);
-  border: 1px solid var(--dw-hair);
+  background: var(--bl-surface);
+  border: 1px solid var(--bl-hair);
   border-radius: 50%;
-  color: var(--dw-muted);
+  color: var(--bl-muted);
   display: flex;
   flex-shrink: 0;
   font-size: 0.3rem;
@@ -237,35 +237,35 @@ onMounted(async () => {
   margin: 0;
 }
 .cat-tabs {
-  display: flex; gap: 0.24rem; overflow-x: auto; padding: 0.1rem var(--dw-pad-x) 0.16rem; white-space: nowrap;
+  display: flex; gap: 0.24rem; overflow-x: auto; padding: 0.1rem var(--bl-pad-x) 0.16rem; white-space: nowrap;
 }
 .cat-tab {
-  background: none; border: none; color: var(--dw-faint); font-size: 0.34rem; padding: 0.1rem 0.18rem; border-radius: 999px;
+  background: none; border: none; color: var(--bl-faint); font-size: 0.34rem; padding: 0.1rem 0.18rem; border-radius: 999px;
   position: relative;
 }
 .cat-tab.is-active {
-  background: var(--dw-surface);
-  border: 1px solid var(--dw-hair);
-  color: var(--dw-text);
+  background: var(--bl-surface);
+  border: 1px solid var(--bl-hair);
+  color: var(--bl-text);
   font-weight: 600;
 }
-.sub-tabs { align-items: center; display: flex; gap: 0.24rem; padding: 0.08rem var(--dw-pad-x) 0.2rem; }
+.sub-tabs { align-items: center; display: flex; gap: 0.24rem; padding: 0.08rem var(--bl-pad-x) 0.2rem; }
 .sub-tab {
-  background: var(--dw-surface-2); border: none; border-radius: 999px; color: var(--dw-muted);
+  background: var(--bl-surface-2); border: none; border-radius: 999px; color: var(--bl-muted);
   font-size: 0.28rem; padding: 0.1rem 0.22rem;
 }
-.sub-tab.is-active { background: var(--dw-cyan); color: var(--dw-ink-on-cyan); font-weight: 700; }
-.more { color: var(--dw-faint); font-size: 0.26rem; margin-left: auto; }
+.sub-tab.is-active { background: var(--bl-grad); box-shadow: var(--bl-glow-shadow); color: var(--bl-on-accent); font-weight: 700; }
+.more { color: var(--bl-faint); font-size: 0.26rem; margin-left: auto; }
 .video-list {
   display: grid;
   gap: 0.2rem;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  padding: 0 var(--dw-pad-x) 0.4rem;
+  padding: 0 var(--bl-pad-x) 0.4rem;
 }
 .video-row {
-  background: var(--dw-surface);
-  border: 1px solid var(--dw-hair);
-  border-radius: var(--dw-radius);
+  background: var(--bl-surface);
+  border: 1px solid var(--bl-hair);
+  border-radius: var(--bl-radius);
   min-width: 0;
   overflow: hidden;
 }
@@ -302,7 +302,7 @@ onMounted(async () => {
   border-radius: 0.1rem; flex-shrink: 0; height: 1.58974rem; overflow: hidden; width: 2.41026rem;
 }
 .video-row__cover--ad {
-  align-items: center; background: linear-gradient(135deg,#3a2030,#1a1a1a); color: var(--dw-notice);
+  align-items: center; background: linear-gradient(135deg,#3a1848,#140C26); color: var(--bl-notice);
   display: flex; font-size: 0.26rem; justify-content: center;
 }
 .video-row__body { flex: 1; min-width: 0; }

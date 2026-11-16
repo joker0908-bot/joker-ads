@@ -37,13 +37,13 @@ const isWatching = computed(
 .app-shell,
 .boot {
   min-height: 100vh;
-  background: var(--dw-bg);
+  background: var(--bl-bg);
 }
 .boot {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--dw-muted);
+  color: var(--bl-muted);
   font-size: 14px;
   letter-spacing: 0.12em;
 }

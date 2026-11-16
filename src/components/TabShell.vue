@@ -32,6 +32,6 @@ function onChange(id) {
 <style scoped>
 .tab-shell {
   min-height: 100vh;
-  padding-bottom: calc(var(--dw-tabbar-h) + env(safe-area-inset-bottom));
+  padding-bottom: calc(var(--bl-tabbar-h) + env(safe-area-inset-bottom));
 }
 </style>

@@ -2,9 +2,9 @@
   <header class="hero">
     <div class="hero__wash" aria-hidden="true" />
     <div class="hero__brand">
-      <img class="brand-logo" src="/brand/logo.png" alt="得污" width="160" height="160" />
+      <img class="brand-logo" src="/brand/logo.png" alt="菠萝视频" width="160" height="160" />
       <div class="brand-copy">
-        <strong>得污</strong>
+        <strong>菠萝视频</strong>
         <span>成人版</span>
       </div>
     </div>
@@ -72,7 +72,7 @@ watch(() => [props.categories, props.modes], syncHeaderSelection, { immediate: t
 
 <style scoped>
 .hero {
-  background: linear-gradient(180deg, #0c1016 0%, #090b0e 72%);
+  background: linear-gradient(180deg, #140C26 0%, #0B0716 72%);
   overflow: hidden;
   padding: 0.28rem 0 0.52rem;
   position: sticky;
@@ -82,8 +82,8 @@ watch(() => [props.categories, props.modes], syncHeaderSelection, { immediate: t
 
 .hero__wash {
   background:
-    radial-gradient(ellipse 70% 90% at 8% -10%, rgba(0, 200, 232, 0.14), transparent 55%),
-    radial-gradient(ellipse 50% 70% at 92% 0%, rgba(0, 120, 150, 0.08), transparent 50%);
+    radial-gradient(ellipse 70% 90% at 8% -10%, rgba(138, 92, 255, 0.28), transparent 55%),
+    radial-gradient(ellipse 50% 70% at 92% 0%, rgba(76, 141, 255, 0.18), transparent 50%);
   inset: 0;
   pointer-events: none;
   position: absolute;
@@ -96,7 +96,7 @@ watch(() => [props.categories, props.modes], syncHeaderSelection, { immediate: t
   padding: 0 0.36rem 0.12rem;
   position: relative;
   z-index: 1;
-  animation: brand-in 0.55s var(--dw-ease) both;
+  animation: brand-in 0.55s var(--bl-ease) both;
 }
 
 @keyframes brand-in {
@@ -107,7 +107,7 @@ watch(() => [props.categories, props.modes], syncHeaderSelection, { immediate: t
 .brand-logo {
   border-radius: 0.26rem;
   box-shadow:
-    0 0 0 1px rgba(0, 200, 232, 0.2),
+    0 0 0 1px rgba(255, 79, 216, 0.42),
     0 0.1rem 0.32rem rgba(0, 0, 0, 0.4);
   display: block;
   height: 1.04rem;
@@ -123,17 +123,20 @@ watch(() => [props.categories, props.modes], syncHeaderSelection, { immediate: t
 }
 
 .brand-copy strong {
-  color: #f5f7fa;
-  font-size: 0.44rem;
+  background: linear-gradient(90deg, #ffe56a, #ff8ae0 58%, #9db7ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-size: 0.42rem;
   font-weight: 700;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.06em;
 }
 
 .brand-copy span {
   align-self: flex-start;
-  background: var(--dw-cyan);
+  background: var(--bl-grad); box-shadow: var(--bl-glow-shadow);
   border-radius: 0.05rem;
-  color: var(--dw-ink-on-cyan);
+  color: var(--bl-on-accent);
   font-size: 0.2rem;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -154,23 +157,23 @@ watch(() => [props.categories, props.modes], syncHeaderSelection, { immediate: t
 .hero__tab {
   background: transparent;
   border: none;
-  color: var(--dw-faint);
+  color: var(--bl-faint);
   flex-shrink: 0;
   font-size: 0.36rem;
   font-weight: 500;
   padding: 0.12rem 0 0.22rem;
   position: relative;
-  transition: color 0.2s var(--dw-ease);
+  transition: color 0.2s var(--bl-ease);
 }
 
 .hero__tab.is-active {
-  color: var(--dw-text);
+  color: var(--bl-text);
   font-size: 0.4rem;
   font-weight: 700;
 }
 
 .hero__tab.is-active::after {
-  background: var(--dw-cyan);
+  background: var(--bl-grad); box-shadow: var(--bl-glow-shadow);
   border-radius: 99px;
   bottom: 0.04rem;
   content: '';
@@ -181,8 +184,8 @@ watch(() => [props.categories, props.modes], syncHeaderSelection, { immediate: t
 }
 
 .mode-switch {
-  background: rgba(15, 18, 24, 0.88);
-  border: 1px solid var(--dw-hair);
+  background: rgba(20, 12, 38, 0.88);
+  border: 1px solid var(--bl-hair);
   border-radius: 999px;
   display: flex;
   margin: 0.22rem 0.36rem 0;
@@ -196,23 +199,23 @@ watch(() => [props.categories, props.modes], syncHeaderSelection, { immediate: t
   background: transparent;
   border: none;
   border-radius: 999px;
-  color: var(--dw-muted);
+  color: var(--bl-muted);
   flex: 1;
   font-size: 0.34rem;
   font-weight: 500;
   height: 0.84rem;
-  transition: background 0.22s var(--dw-ease), color 0.22s var(--dw-ease);
+  transition: background 0.22s var(--bl-ease), color 0.22s var(--bl-ease);
 }
 
 .mode-switch__item.is-active {
-  background: var(--dw-cyan);
-  color: var(--dw-ink-on-cyan);
+  background: var(--bl-grad); box-shadow: var(--bl-glow-shadow);
+  color: var(--bl-on-accent);
   font-weight: 700;
 }
 
 .hero__wave {
   bottom: -1px;
-  color: var(--dw-bg);
+  color: var(--bl-bg);
   height: 0.28rem;
   left: 0;
   pointer-events: none;

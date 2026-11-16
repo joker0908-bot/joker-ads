@@ -46,8 +46,8 @@ export function sessionCookie(token, req, maxAgeSec) {
 }
 
 function clientIp(req) {
-  const fwd = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()
-  return fwd || req.socket?.remoteAddress || ''
+  // Express applies our loopback-only proxy policy. Never trust raw client headers.
+  return req.ip || req.socket?.remoteAddress || ''
 }
 
 function loginKey(req, username) {
@@ -109,6 +109,9 @@ export function requireAuth(req, res, next) {
   const user = sessionUser(req)
   if (!user) return res.status(401).json({ error: '未登录' })
   req.admin = user
+  if (user.mustChangePassword && !['/api/admin/change-password', '/api/admin/logout'].includes(req.path)) {
+    return res.status(403).json({ code: 'PASSWORD_CHANGE_REQUIRED', error: '请先修改初始密码' })
+  }
   next()
 }
 
@@ -174,9 +177,13 @@ export function handleChangePassword(req, res) {
     return res.status(400).json({ error: '原密码错误' })
   }
   const { salt, hash } = hashPassword(newPassword)
-  db.prepare('UPDATE admins SET password_hash = ?, password_salt = ?, must_change_password = 0, updated_at = ? WHERE id = ?').run(hash, salt, now(), row.id)
+  db.transaction(() => {
+    db.prepare('UPDATE admins SET password_hash = ?, password_salt = ?, must_change_password = 0, updated_at = ? WHERE id = ?').run(hash, salt, now(), row.id)
+    db.prepare('DELETE FROM sessions WHERE admin_id = ?').run(row.id)
+  })()
   writeLog({ admin: req.admin, action: '修改登录密码', targetType: 'admins', targetId: row.id, ip: clientIp(req) })
-  res.json({ ok: true })
+  res.setHeader('Set-Cookie', sessionCookie('', req, 0))
+  res.json({ ok: true, requireLogin: true })
 }
 
 export async function loadTotp() {
