@@ -82,10 +82,42 @@ function initSchema(database) {
       created_at TEXT NOT NULL,
       FOREIGN KEY (customer_id) REFERENCES customers(id)
     );
+    CREATE TABLE IF NOT EXISTS customer_wallets (
+      customer_id TEXT PRIMARY KEY,
+      diamonds INTEGER NOT NULL DEFAULT 0,
+      vip_until TEXT,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (customer_id) REFERENCES customers(id)
+    );
+    CREATE TABLE IF NOT EXISTS pay_orders (
+      mch_order_no TEXT PRIMARY KEY,
+      customer_id TEXT NOT NULL,
+      package_id TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      package_name TEXT NOT NULL,
+      amount_fen INTEGER NOT NULL,
+      product_id INTEGER NOT NULL,
+      vip_days INTEGER NOT NULL DEFAULT 0,
+      diamonds INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL,
+      pay_order_id TEXT,
+      created_at TEXT NOT NULL,
+      paid_at TEXT,
+      FOREIGN KEY (customer_id) REFERENCES customers(id)
+    );
+    CREATE TABLE IF NOT EXISTS wallet_ledger (
+      id TEXT PRIMARY KEY,
+      customer_id TEXT NOT NULL,
+      mch_order_no TEXT NOT NULL UNIQUE,
+      kind TEXT NOT NULL,
+      diamonds INTEGER NOT NULL,
+      vip_days INTEGER NOT NULL,
+      note TEXT,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (customer_id) REFERENCES customers(id)
+    );
   `)
   seedPromoter(database)
-  // This system row is an invitation attribution target, never a customer login.
-  database.prepare('DELETE FROM customer_tokens WHERE customer_id = ?').run('DW1000147271297')
 }
 
 function seedPromoter(database) {
@@ -121,7 +153,7 @@ export function verifyPassword(password, salt, hash) {
   return crypto.timingSafeEqual(Buffer.from(next, 'hex'), Buffer.from(hash, 'hex'))
 }
 
-export function seedAdmin(database) {
+function seedAdmin(database) {
   const count = database.prepare('SELECT COUNT(*) AS c FROM admins').get().c
   if (count > 0) return
   const username = process.env.ADMIN_BOOTSTRAP_USER || 'admin'

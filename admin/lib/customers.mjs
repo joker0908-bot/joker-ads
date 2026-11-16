@@ -1,5 +1,6 @@
 import crypto from 'node:crypto'
 import { getDb, now } from './db.mjs'
+import { walletView } from './wallet.mjs'
 
 export const SEED_NUMERIC = '1000147271297'
 export const SEED_CUSTOMER_ID = `DW${SEED_NUMERIC}`
@@ -50,13 +51,15 @@ function inviteCountOf(db, customerId) {
 }
 
 function publicCard(row, extras = {}) {
+  const customerId = row.customer_id || row.id
   return {
-    customerId: row.customer_id || row.id,
+    customerId,
     cardNo: row.card_no,
     inviteCode: row.invite_code,
     invitedBy: row.invited_by || '',
     status: row.status || 'active',
     issuedAt: row.issued_at || row.created_at,
+    ...walletView(customerId),
     ...extras,
   }
 }
@@ -118,21 +121,11 @@ export function claimCustomer({ deviceFp, inviteCode, cardToken }) {
     err.status = 400
     throw err
   }
-  if (fp.startsWith('seed:')) {
-    const err = new Error('系统邀请身份不可领取')
-    err.status = 403
-    throw err
-  }
 
   const byToken = cardToken
     ? db.prepare('SELECT customer_id FROM customer_tokens WHERE token = ?').get(cardToken)
     : null
   if (byToken) {
-    if (byToken.customer_id === SEED_CUSTOMER_ID) {
-      const err = new Error('系统邀请身份不可登录')
-      err.status = 403
-      throw err
-    }
     touch(db, byToken.customer_id)
     const row = loadByCustomerId(db, byToken.customer_id)
     return { ...publicCard(row, { inviteCount: inviteCountOf(db, byToken.customer_id) }), token: cardToken, isNew: false }
@@ -140,7 +133,6 @@ export function claimCustomer({ deviceFp, inviteCode, cardToken }) {
 
   const byFp = db.prepare('SELECT id FROM customers WHERE device_fp = ?').get(fp)
   if (byFp) {
-    if (byFp.id === SEED_CUSTOMER_ID) throw Object.assign(new Error('系统邀请身份不可领取'), { status: 403 })
     touch(db, byFp.id)
     const row = loadByCustomerId(db, byFp.id)
     const token = issueToken(db, byFp.id)
@@ -174,7 +166,7 @@ export function readCustomerByToken(cardToken) {
   if (!cardToken) return null
   const db = getDb()
   const hit = db.prepare('SELECT customer_id FROM customer_tokens WHERE token = ?').get(cardToken)
-  if (!hit || hit.customer_id === SEED_CUSTOMER_ID) return null
+  if (!hit) return null
   touch(db, hit.customer_id)
   const row = loadByCustomerId(db, hit.customer_id)
   const invited = db.prepare('SELECT COUNT(*) AS c FROM customers WHERE invited_by = ?').get(hit.customer_id).c
@@ -185,9 +177,11 @@ export function listCustomers({ limit = 100, offset = 0 } = {}) {
   const db = getDb()
   const rows = db.prepare(`
     SELECT c.id, c.invite_code, c.invited_by, c.created_at, c.last_seen_at,
-           i.card_no, i.status, i.issued_at
+           i.card_no, i.status, i.issued_at,
+           COALESCE(w.diamonds, 0) AS diamonds, w.vip_until
     FROM customers c
     JOIN identity_cards i ON i.customer_id = c.id
+    LEFT JOIN customer_wallets w ON w.customer_id = c.id
     ORDER BY c.created_at DESC
     LIMIT ? OFFSET ?
   `).all(limit, offset)

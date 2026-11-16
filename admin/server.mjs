@@ -8,17 +8,25 @@ import {
   readDraft,
   writeDraft,
   writeLive,
-  savePublishedPart,
+  publishAll,
   syncDraftFromLive,
   readJson,
   readLive,
-  readPublished,
-  publishApiSession,
 } from './lib/jsonStore.mjs'
 import { publicApiSession, normalizeApiSession } from './lib/apiSession.mjs'
 import { addAppPlacement, updateAppPlacements } from './lib/appPlacements.mjs'
 import { getDb, id, now, hashPassword, writeLog } from './lib/db.mjs'
 import { claimCustomer, readCustomerByToken, listCustomers, cardCookie, CARD_COOKIE } from './lib/customers.mjs'
+import {
+  publicCatalog,
+  reserveOrder,
+  attachPayOrder,
+  failPayOrder,
+  creditPaidOrder,
+  listCustomerOrders,
+  redeemVipDays,
+  REDEEM_RULE,
+} from './lib/wallet.mjs'
 import {
   requireAuth,
   requireRead,
@@ -32,6 +40,21 @@ import {
   sessionCookie,
   loadTotp,
 } from './lib/auth.mjs'
+import {
+  getVideo,
+  isHuangguoId,
+  listCategories,
+  listVideos,
+  mediaFileFor,
+  mimeFor,
+  verifyPlayToken,
+  writeCover,
+  writePlaylist,
+  writeSegment,
+} from './lib/siteVideos.mjs'
+import * as dewuApi from './lib/dewuApi.mjs'
+import * as dewuVideos from './lib/dewuVideos.mjs'
+import { createDramaApiKey, deleteDramaApiKey, dramaKeyAllows, listDramaApiKeys, setDramaApiKeyPaused, touchKeyUsed } from './lib/dramaApiKey.mjs'
 
 const HOST = process.env.ADMIN_HOST || '127.0.0.1'
 const PORT = Number(process.env.ADMIN_PORT || 8790)
@@ -41,7 +64,7 @@ ensureDirs()
 getDb()
 
 const app = express()
-app.set('trust proxy', 'loopback')
+app.set('trust proxy', true)
 app.use(express.json({ limit: '4mb' }))
 
 const storage = multer.diskStorage({
@@ -62,12 +85,7 @@ const upload = multer({
   limits: { fileSize: 8 * 1024 * 1024 },
   fileFilter(_req, file, cb) {
     const ext = path.extname(file.originalname || '').toLowerCase()
-    if (!IMAGE_EXTS.has(ext)) {
-      // 类型不符属于客户端错误，标记 400 避免落入兜底 500
-      const err = new Error('仅支持图片上传')
-      err.status = 400
-      return cb(err)
-    }
+    if (!IMAGE_EXTS.has(ext)) return cb(new Error('仅支持图片上传'))
     cb(null, true)
   },
 })
@@ -90,33 +108,61 @@ function seedFromRepoIfEmpty() {
 seedFromRepoIfEmpty()
 if (!readDraft('meta.json')) writeDraft('meta.json', readLive('meta.json') || { version: 1 })
 
+function sameJson(a, b) {
+  return JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
+}
+
+function draftChanges() {
+  const draft = {
+    config: readDraft('config.json') || {},
+    popups: readDraft('popups.json') || {},
+    tabs: readDraft('tabs.json') || {},
+  }
+  const live = {
+    config: readLive('config.json') || {},
+    popups: readLive('popups.json') || {},
+    tabs: readLive('tabs.json') || {},
+  }
+  const slices = [
+    ['进站弹窗', draft.popups.afterEnterApp, live.popups.afterEnterApp],
+    ['网格弹窗', draft.popups.gridPopAds, live.popups.gridPopAds],
+    ['顶部促销', draft.config.promo, live.config.promo],
+    ['悬浮条', draft.config.floatBanner, live.config.floatBanner],
+    ['应用列表', draft.config.apps, live.config.apps],
+    ['分类', { categories: draft.config.categories, categoryApps: draft.config.categoryApps }, { categories: live.config.categories, categoryApps: live.config.categoryApps }],
+    ['精选广告', draft.tabs.featured?.ad, live.tabs.featured?.ad],
+    ['我的页应用', draft.tabs.mine?.quickApps, live.tabs.mine?.quickApps],
+  ]
+  const changes = slices.filter(([, left, right]) => !sameJson(left, right)).map(([label]) => label)
+  const fileDirty = ['config.json', 'popups.json', 'tabs.json'].some((name) => !sameJson(readDraft(name), readLive(name)))
+  if (fileDirty && !changes.length) changes.push('其他站点设置')
+  return { dirty: changes.length > 0, changes }
+}
+
 function getBundle() {
-  const published = readPublished()
   return {
-    config: published.config,
-    popups: published.popups,
-    tabs: published.tabs,
-    meta: published.meta,
-    autoPublish: true,
+    config: readDraft('config.json') || {},
+    popups: readDraft('popups.json') || {},
+    tabs: readDraft('tabs.json') || {},
+    meta: readDraft('meta.json') || { version: 1 },
+    publish: draftChanges(),
   }
 }
 
 function saveBundle(part, value) {
-  return savePublishedPart(part, value)
+  if (part === 'config') writeDraft('config.json', value)
+  else if (part === 'popups') writeDraft('popups.json', value)
+  else if (part === 'tabs') writeDraft('tabs.json', value)
+  else throw new Error('unknown part')
 }
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true, service: 'ads-king-admin' })
 })
 
-readPublished()
-app.get('/data/:file', (req, res) => {
+app.use('/data', express.static(LIVE_DIR, { etag: true, maxAge: 0, setHeaders(res) {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
-  if (req.params.file === 'site-bundle.json') return res.json(readPublished())
-  if (!/^(config|popups|tabs|meta|api-session)\.json$/.test(req.params.file)) return res.sendStatus(404)
-  res.json(readLive(req.params.file))
-})
-app.use('/data', (_req, res) => res.sendStatus(404))
+}}))
 
 app.use('/uploads', express.static(UPLOAD_DIR, { etag: true, maxAge: '30d' }))
 
@@ -149,6 +195,403 @@ app.get('/api/public/customers/me', (req, res) => {
   const row = readCustomerByToken(token)
   if (!row) return res.status(404).json({ error: '未找到身份卡' })
   res.json({ ok: true, ...row })
+})
+
+function payInternalOk(req) {
+  const expected = String(process.env.PAY_INTERNAL_TOKEN || '')
+  const got = String(req.get('x-pay-internal') || '')
+  if (!expected || expected.length < 16 || got.length !== expected.length) return false
+  return crypto.timingSafeEqual(Buffer.from(got), Buffer.from(expected))
+}
+
+function customerFromPayBody(req) {
+  const token = String(req.body?.cardToken || cookies(req)[CARD_COOKIE] || '')
+  return readCustomerByToken(token)
+}
+
+function videoError(res, e) {
+  const status = Number(e?.status) || 500
+  res.status(status).json({
+    ok: false,
+    error: e?.message || '加载失败',
+    code: e?.code || 'upstream',
+  })
+}
+
+function dewuError(res, e) {
+  const status = Number(e?.status) || 500
+  res.status(status).json({
+    code: status,
+    message: e?.message || '加载失败',
+    error: e?.code || 'upstream',
+  })
+}
+
+function dewuCors(req, res, next) {
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Accept, Content-Type, X-Api-Key, Authorization')
+  if (req.method === 'OPTIONS') return res.status(204).end()
+  next()
+}
+
+function requireSuper(req, res, next) {
+  if (req.admin?.role !== 'super') return res.status(403).json({ error: '仅超管可操作' })
+  next()
+}
+
+function readRequestKey(req) {
+  const header = String(req.headers['x-api-key'] || '').trim()
+  if (header) return header
+  const auth = String(req.headers.authorization || '').trim()
+  if (/^bearer\s+/i.test(auth)) return auth.replace(/^bearer\s+/i, '').trim()
+  return String(req.query.key || '').trim()
+}
+
+const dewuRateLimit = new Map()
+const DEWU_RATE_PER_MIN = Math.max(30, Number(process.env.DEWU_API_RATE_PER_MIN || 300))
+
+function dewuRateOk(key) {
+  const now = Date.now()
+  let row = dewuRateLimit.get(key)
+  if (!row || now - row.windowStart > 60_000) {
+    row = { windowStart: now, count: 0 }
+    dewuRateLimit.set(key, row)
+  }
+  row.count += 1
+  if (dewuRateLimit.size > 5000) {
+    for (const [k, v] of dewuRateLimit) {
+      if (now - v.windowStart > 120_000) dewuRateLimit.delete(k)
+    }
+  }
+  return row.count <= DEWU_RATE_PER_MIN
+}
+
+function dewuRequireKey(req, res, next) {
+  if (req.method === 'OPTIONS') return next()
+  if (req.path === '/api/seg' || req.path === '/api/vseg') return next()
+  const key = readRequestKey(req)
+  if (!dramaKeyAllows(key, 'dewu')) {
+    return res.status(401).json({ code: 401, message: '需要 API Key', error: 'unauthorized' })
+  }
+  touchKeyUsed(key)
+  if (!dewuRateOk(key)) {
+    return res.status(429).json({ code: 429, message: '请求过于频繁', error: 'rate_limited' })
+  }
+  next()
+}
+
+app.use('/dewu-api', dewuCors)
+app.use('/dewu-api', dewuRequireKey)
+
+app.get('/dewu-api/api/shows', async (req, res) => {
+  try {
+    res.json({ code: 200, data: await dewuApi.listShows({ size: req.query.size }) })
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/show/:id', async (req, res) => {
+  try {
+    res.json({ code: 200, data: await dewuApi.getShow(req.params.id) })
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/cover/:id', async (req, res) => {
+  try {
+    const ok = await dewuApi.writeShowCover(req.params.id, res)
+    if (!ok) return res.status(404).json({ code: 404, message: '该视频暂不可用', error: 'not_found' })
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/seg', async (req, res) => {
+  try {
+    const ok = await dewuApi.writeShowSegment(req.query.id, req.query.p, req.query.exp, req.query.sig, res)
+    if (!ok) return res.status(404).json({ code: 404, message: '该视频暂不可用', error: 'unavailable' })
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/video/:id/:epId', async (req, res) => {
+  try {
+    await dewuApi.writePlaylist(req.params.id, req.params.epId, res)
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/videos', async (req, res) => {
+  try {
+    const out = await dewuVideos.listVideos(req.query)
+    res.json({
+      code: 200,
+      data: out.items,
+      total: out.total,
+      page: out.page,
+      pageSize: out.pageSize,
+      enriched: out.enriched,
+      complete: out.complete,
+      updatedAt: out.updatedAt,
+    })
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/videos/tags', async (req, res) => {
+  try {
+    res.json({ code: 200, data: await dewuVideos.listVideoTags() })
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/videos/categories', async (req, res) => {
+  try {
+    res.json({ code: 200, data: await dewuVideos.listVideoCategories() })
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/shorts', async (req, res) => {
+  try {
+    const out = await dewuVideos.listShorts(req.query)
+    res.json({ code: 200, data: out.items, page: out.page, pageSize: out.pageSize })
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/skits', async (req, res) => {
+  try {
+    const out = await dewuVideos.listSkits(req.query)
+    res.json({
+      code: 200,
+      data: out.items,
+      total: out.total,
+      page: out.page,
+      pageSize: out.pageSize,
+      complete: out.complete,
+      updatedAt: out.updatedAt,
+    })
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/skits/tags', async (req, res) => {
+  try {
+    res.json({ code: 200, data: await dewuVideos.listSkitTags() })
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/skits/categories', async (req, res) => {
+  try {
+    res.json({ code: 200, data: await dewuVideos.listSkitCategories() })
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/skits/:id/play', async (req, res) => {
+  try {
+    await dewuVideos.writeSkitPlaylist(req.params.id, req.query.ep, req.query.mode, res)
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/skits/:id/cover', async (req, res) => {
+  try {
+    const ok = await dewuVideos.writeSkitCover(req.params.id, res)
+    if (!ok) return res.status(404).json({ code: 404, message: '该视频暂不可用', error: 'not_found' })
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/skits/:id', async (req, res) => {
+  try {
+    res.json({ code: 200, data: await dewuVideos.getSkit(req.params.id) })
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/videos/:id/play', async (req, res) => {
+  try {
+    await dewuVideos.writePlaylist(req.params.id, req.query.mode, res)
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/videos/:id/cover', async (req, res) => {
+  try {
+    const ok = await dewuVideos.writeCover(req.params.id, res)
+    if (!ok) return res.status(404).json({ code: 404, message: '该视频暂不可用', error: 'not_found' })
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/vseg', async (req, res) => {
+  try {
+    dewuVideos.verifySeg(req.query.u, req.query.exp, req.query.sig)
+    await dewuVideos.proxyMedia(req.query.u, res)
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/videos/:id', async (req, res) => {
+  try {
+    const detail = await dewuVideos.getVideo(req.params.id)
+    const { _playUrl, _previewUrl, _coverPath, ...pub } = detail
+    res.json({ code: 200, data: pub })
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/api/public/videos/categories', async (_req, res) => {
+  try {
+    res.json({ ok: true, categories: await listCategories() })
+  } catch (e) {
+    videoError(res, e)
+  }
+})
+
+app.get('/api/public/videos', async (req, res) => {
+  try {
+    res.json(await listVideos({
+      category: req.query.category,
+      q: req.query.q,
+      page: req.query.page,
+      pageSize: req.query.pageSize,
+    }))
+  } catch (e) {
+    videoError(res, e)
+  }
+})
+
+app.get('/api/public/videos/:id/media', async (req, res) => {
+  try {
+    verifyPlayToken(req.params.id, req.query.exp, req.query.sig)
+    if (isHuangguoId(req.params.id)) {
+      await writePlaylist(req.params.id, req.query.ep, req.query.exp, req.query.sig, res)
+      return
+    }
+    const file = mediaFileFor(req.params.id)
+    if (!file) return res.status(404).json({ ok: false, error: '该视频暂不可用', code: 'unavailable' })
+    res.setHeader('Cache-Control', 'private, no-store')
+    res.sendFile(file, { headers: { 'Content-Type': mimeFor(file) } })
+  } catch (e) {
+    videoError(res, e)
+  }
+})
+
+app.get('/api/public/videos/:id/seg', async (req, res) => {
+  try {
+    verifyPlayToken(req.params.id, req.query.exp, req.query.sig)
+    const ok = await writeSegment(req.params.id, req.query.p, res)
+    if (!ok) return res.status(404).json({ ok: false, error: '该视频暂不可用', code: 'unavailable' })
+  } catch (e) {
+    videoError(res, e)
+  }
+})
+
+app.get('/api/public/videos/:id/cover', async (req, res) => {
+  try {
+    const ok = await writeCover(req.params.id, res)
+    if (!ok) return res.status(404).json({ ok: false, error: '该视频暂不可用', code: 'not_found' })
+  } catch (e) {
+    videoError(res, e)
+  }
+})
+
+app.get('/api/public/videos/:id', async (req, res) => {
+  try {
+    res.json(await getVideo(req.params.id, { episode: req.query.ep }))
+  } catch (e) {
+    videoError(res, e)
+  }
+})
+
+app.get('/api/public/pay/catalog', (_req, res) => {
+  res.json({ ok: true, packages: publicCatalog(), redeem: REDEEM_RULE })
+})
+
+app.post('/api/public/pay/redeem', (req, res) => {
+  try {
+    const customer = customerFromPayBody(req)
+    if (!customer) return res.status(401).json({ ok: false, message: '请先领取身份卡' })
+    res.json(redeemVipDays({
+      customerId: customer.customerId,
+      days: req.body?.days,
+      requestId: req.body?.requestId,
+    }))
+  } catch (e) {
+    res.status(e.status || 400).json({ ok: false, message: e.message || '兑换失败' })
+  }
+})
+
+app.get('/api/public/pay/orders', (req, res) => {
+  const token = String(req.query.token || cookies(req)[CARD_COOKIE] || '')
+  const row = readCustomerByToken(token)
+  if (!row) return res.status(401).json({ ok: false, message: '请先领取身份卡' })
+  res.json({ ok: true, orders: listCustomerOrders(row.customerId) })
+})
+
+app.post('/api/internal/pay/reserve', (req, res) => {
+  if (!payInternalOk(req)) return res.status(403).json({ ok: false, message: 'forbidden' })
+  try {
+    const customer = customerFromPayBody(req)
+    if (!customer) return res.status(401).json({ ok: false, message: '请先领取身份卡' })
+    res.json({ ok: true, customerId: customer.customerId, ...reserveOrder({
+      customerId: customer.customerId,
+      packageId: req.body?.packageId,
+      productId: req.body?.productId,
+    }) })
+  } catch (e) {
+    res.status(e.status || 400).json({ ok: false, message: e.message || '下单失败' })
+  }
+})
+
+app.post('/api/internal/pay/attach', (req, res) => {
+  if (!payInternalOk(req)) return res.status(403).json({ ok: false, message: 'forbidden' })
+  try {
+    res.json(attachPayOrder({ mchOrderNo: req.body?.mchOrderNo, payOrderId: req.body?.payOrderId }))
+  } catch (e) {
+    res.status(e.status || 400).json({ ok: false, message: e.message || '记录失败' })
+  }
+})
+
+app.post('/api/internal/pay/fail', (req, res) => {
+  if (!payInternalOk(req)) return res.status(403).json({ ok: false, message: 'forbidden' })
+  res.json(failPayOrder({ mchOrderNo: req.body?.mchOrderNo, reason: req.body?.reason }))
+})
+
+app.post('/api/internal/pay/credit', (req, res) => {
+  if (!payInternalOk(req)) return res.status(403).json({ ok: false, message: 'forbidden' })
+  try {
+    res.json(creditPaidOrder({
+      mchOrderNo: req.body?.mchOrderNo,
+      payOrderId: req.body?.payOrderId,
+      amountFen: req.body?.amountFen,
+    }))
+  } catch (e) {
+    res.status(e.status || 400).json({ ok: false, message: e.message || '入账失败' })
+  }
 })
 
 app.get('/api/admin/customers', requireAuth, requireRead('customers'), (req, res) => {
@@ -208,6 +651,56 @@ app.get('/api/admin/site-config', requireAuth, requireRead('popups'), (_req, res
   res.json(getBundle())
 })
 
+app.get('/api/admin/drama-api-keys', requireAuth, requireRead('settings'), requireSuper, (req, res) => {
+  writeLog({ admin: req.admin, action: '查看短剧 API Key', targetType: 'drama-api-key', ip: clientIp(req) })
+  res.json({ ok: true, keys: listDramaApiKeys() })
+})
+
+app.post('/api/admin/drama-api-keys', requireAuth, requireWrite('settings'), requireSuper, (req, res) => {
+  try {
+    const row = createDramaApiKey({ remark: req.body?.remark, scopes: req.body?.scopes })
+    writeLog({
+      admin: req.admin,
+      action: '新建短剧 API Key',
+      targetType: 'drama-api-key',
+      targetId: row.id,
+      detail: `${row.remark} ${row.scopes.join('+')}`,
+      ip: clientIp(req),
+    })
+    res.json({ ok: true, key: row })
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.status ? e.message : '创建失败' })
+  }
+})
+
+app.post('/api/admin/drama-api-keys/:id', requireAuth, requireWrite('settings'), requireSuper, (req, res) => {
+  const row = setDramaApiKeyPaused(req.params.id, req.body?.paused)
+  if (!row) return res.status(404).json({ error: '钥匙不存在' })
+  writeLog({
+    admin: req.admin,
+    action: row.paused ? '暂停短剧 API Key' : '恢复短剧 API Key',
+    targetType: 'drama-api-key',
+    targetId: row.id,
+    detail: row.remark,
+    ip: clientIp(req),
+  })
+  res.json({ ok: true })
+})
+
+app.delete('/api/admin/drama-api-keys/:id', requireAuth, requireWrite('settings'), requireSuper, (req, res) => {
+  const row = deleteDramaApiKey(req.params.id)
+  if (!row) return res.status(404).json({ error: '钥匙不存在' })
+  writeLog({
+    admin: req.admin,
+    action: '删除短剧 API Key',
+    targetType: 'drama-api-key',
+    targetId: row.id,
+    detail: row.remark,
+    ip: clientIp(req),
+  })
+  res.json({ ok: true })
+})
+
 app.get('/api/admin/api-session', requireAuth, requireRead('settings'), (_req, res) => {
   const draft = readDraft('api-session.json') || {}
   const live = readLive('api-session.json') || {}
@@ -221,80 +714,72 @@ app.put('/api/admin/api-session', requireAuth, requireWrite('settings'), (req, r
   try {
     const previous = readDraft('api-session.json') || readLive('api-session.json') || {}
     const next = normalizeApiSession(req.body || {}, previous)
-    const meta = publishApiSession(next)
-    let auditWarning = false
-    try { writeLog({
+    writeDraft('api-session.json', next)
+    writeLive('api-session.json', next)
+    const meta = readDraft('meta.json') || readLive('meta.json') || { version: 0 }
+    meta.version = Number(meta.version || 0) + 1
+    meta.publishedAt = now()
+    writeLive('meta.json', meta)
+    writeDraft('meta.json', meta)
+    writeLog({
       admin: req.admin,
       action: '轮换原站 token',
       targetType: 'api-session',
       detail: `uid=${next.uid} len=${next.token.length}`,
       ip: clientIp(req),
-    }) } catch { auditWarning = true; console.warn('[config] session committed; audit log unavailable') }
-    res.json({ ok: true, session: publicApiSession(next), meta, auditWarning })
+    })
+    res.json({ ok: true, session: publicApiSession(next), meta })
   } catch (err) {
     res.status(400).json({ error: err.message || 'token 无效' })
   }
 })
 
-function logCommittedChange(entry) {
-  try { writeLog(entry); return false }
-  catch { console.warn('[admin] state committed; audit log unavailable'); return true }
-}
-
 app.put('/api/admin/site-config/:part', requireAuth, requireWrite('popups'), (req, res) => {
   const part = req.params.part
   if (!['config', 'popups', 'tabs'].includes(part)) return res.status(400).json({ error: 'invalid part' })
-  const saved = saveBundle(part, req.body || {})
-  const auditWarning = logCommittedChange({ admin: req.admin, action: `更新并发布 ${part}`, targetType: part, ip: clientIp(req) })
-  res.json({ ok: true, ...saved, auditWarning })
+  saveBundle(part, req.body || {})
+  writeLog({ admin: req.admin, action: `更新草稿 ${part}`, targetType: part, ip: clientIp(req) })
+  res.json({ ok: true })
 })
 
 app.put('/api/admin/slots/:slotKey', requireAuth, requireWrite('popups'), (req, res) => {
   const { slotKey } = req.params
   const items = req.body?.items
   const bundle = getBundle()
-  let saved
 
   if (slotKey === 'afterEnterApp' || slotKey === 'gridPopAds' || slotKey === 'actPopAds') {
     bundle.popups[slotKey] = items || []
-    saved = saveBundle('popups', bundle.popups)
+    saveBundle('popups', bundle.popups)
   } else if (slotKey === 'configPopups') {
     bundle.config.popups = items || []
-    saved = saveBundle('config', bundle.config)
+    saveBundle('config', bundle.config)
   } else if (slotKey === 'promo') {
     bundle.config.promo = { ...(bundle.config.promo || {}), ...(req.body || {}) }
-    saved = saveBundle('config', bundle.config)
+    saveBundle('config', bundle.config)
   } else if (slotKey === 'floatBanner') {
     bundle.config.floatBanner = { ...(bundle.config.floatBanner || {}), ...(req.body || {}) }
-    saved = saveBundle('config', bundle.config)
+    saveBundle('config', bundle.config)
   } else if (slotKey === 'featuredAd') {
     bundle.tabs.featured = bundle.tabs.featured || {}
     bundle.tabs.featured.ad = { ...(bundle.tabs.featured.ad || {}), ...(req.body || {}) }
-    saved = saveBundle('tabs', bundle.tabs)
+    saveBundle('tabs', bundle.tabs)
   } else if (slotKey === 'mineQuickApps') {
     bundle.tabs.mine = bundle.tabs.mine || {}
     bundle.tabs.mine.quickApps = items || []
-    saved = saveBundle('tabs', bundle.tabs)
+    saveBundle('tabs', bundle.tabs)
   } else {
     return res.status(400).json({ error: 'unknown slot' })
   }
 
-  const auditWarning = logCommittedChange({ admin: req.admin, action: `编辑广告位 ${slotKey}`, targetType: 'slot', targetId: slotKey, ip: clientIp(req) })
-  res.json({ ok: true, ...saved, auditWarning })
+  writeLog({ admin: req.admin, action: `编辑广告位 ${slotKey}`, targetType: 'slot', targetId: slotKey, ip: clientIp(req) })
+  res.json({ ok: true })
 })
 
 app.get('/api/admin/apps', requireAuth, requireRead('apps'), (req, res) => {
   const q = String(req.query.q || '').trim().toLowerCase()
   const page = Math.max(1, Number(req.query.page || 1))
   const pageSize = Math.min(100, Math.max(10, Number(req.query.pageSize || 30)))
-  const all = getBundle().config.apps || []
-  const counts = new Map()
-  const canonical = new Map()
-  for (const item of all) {
-    counts.set(item.name, (counts.get(item.name) || 0) + 1)
-    canonical.set(item.name, item)
-  }
-  let apps = [...canonical.values()].map(item => ({ ...item, duplicateCount: counts.get(item.name) }))
+  let apps = getBundle().config.apps || []
   if (q) apps = apps.filter((a) => String(a.name || '').toLowerCase().includes(q) || String(a.url || '').toLowerCase().includes(q))
   const total = apps.length
   const start = (page - 1) * pageSize
@@ -315,13 +800,13 @@ app.post('/api/admin/apps', requireAuth, requireWrite('apps'), (req, res) => {
     icon: String(appItem.icon || '/icons/placeholder.png'),
   })
   addAppPlacement(bundle.config, name)
-  const saved = saveBundle('config', bundle.config)
-  const auditWarning = logCommittedChange({ admin: req.admin, action: `新增应用 ${name}`, targetType: 'apps', targetId: name, ip: clientIp(req) })
-  res.json({ ok: true, ...saved, auditWarning })
+  saveBundle('config', bundle.config)
+  writeLog({ admin: req.admin, action: `新增应用 ${name}`, targetType: 'apps', targetId: name, ip: clientIp(req) })
+  res.json({ ok: true })
 })
 
 app.put('/api/admin/apps/:name', requireAuth, requireWrite('apps'), (req, res) => {
-  const oldName = req.params.name
+  const oldName = decodeURIComponent(req.params.name)
   const body = req.body || {}
   const bundle = getBundle()
   const idx = (bundle.config.apps || []).findIndex((a) => a.name === oldName)
@@ -331,23 +816,25 @@ app.put('/api/admin/apps/:name', requireAuth, requireWrite('apps'), (req, res) =
   if (nextName !== oldName && bundle.config.apps.some((a) => a.name === nextName)) {
     return res.status(409).json({ error: '应用名称已存在' })
   }
-  const canonical = bundle.config.apps.findLast(item => item.name === oldName)
-  const fields = Object.fromEntries(['url', 'signUrl', 'icon'].map(k => [k, body[k] !== undefined ? body[k] : canonical[k] || '']))
-  bundle.config.apps = bundle.config.apps.map(item => item.name === oldName ? { ...item, ...fields, name: nextName } : item)
+  bundle.config.apps[idx] = {
+    ...bundle.config.apps[idx],
+    ...body,
+    name: nextName,
+  }
   if (nextName !== oldName) updateAppPlacements(bundle.config, oldName, nextName)
-  const saved = saveBundle('config', bundle.config)
-  const auditWarning = logCommittedChange({ admin: req.admin, action: `编辑应用 ${nextName}`, targetType: 'apps', targetId: nextName, ip: clientIp(req) })
-  res.json({ ok: true, ...saved, auditWarning })
+  saveBundle('config', bundle.config)
+  writeLog({ admin: req.admin, action: `编辑应用 ${nextName}`, targetType: 'apps', targetId: nextName, ip: clientIp(req) })
+  res.json({ ok: true })
 })
 
 app.delete('/api/admin/apps/:name', requireAuth, requireWrite('apps'), (req, res) => {
-  const name = req.params.name
+  const name = decodeURIComponent(req.params.name)
   const bundle = getBundle()
   bundle.config.apps = (bundle.config.apps || []).filter((a) => a.name !== name)
   updateAppPlacements(bundle.config, name)
-  const saved = saveBundle('config', bundle.config)
-  const auditWarning = logCommittedChange({ admin: req.admin, action: `删除应用 ${name}`, targetType: 'apps', targetId: name, ip: clientIp(req) })
-  res.json({ ok: true, ...saved, auditWarning })
+  saveBundle('config', bundle.config)
+  writeLog({ admin: req.admin, action: `删除应用 ${name}`, targetType: 'apps', targetId: name, ip: clientIp(req) })
+  res.json({ ok: true })
 })
 
 app.get('/api/admin/category-apps', requireAuth, requireRead('categories'), (_req, res) => {
@@ -358,19 +845,15 @@ app.put('/api/admin/category-apps', requireAuth, requireWrite('categories'), (re
   const bundle = getBundle()
   bundle.config.categoryApps = req.body?.categoryApps || bundle.config.categoryApps || {}
   if (Array.isArray(req.body?.categories)) bundle.config.categories = req.body.categories
-  const saved = saveBundle('config', bundle.config)
-  const auditWarning = logCommittedChange({ admin: req.admin, action: '更新分类应用映射', targetType: 'categoryApps', ip: clientIp(req) })
-  res.json({ ok: true, ...saved, auditWarning })
+  saveBundle('config', bundle.config)
+  writeLog({ admin: req.admin, action: '更新分类应用映射', targetType: 'categoryApps', ip: clientIp(req) })
+  res.json({ ok: true })
 })
 
 app.post('/api/admin/publish', requireAuth, requireWrite('publish'), (req, res) => {
-  // Older admin tabs still call this endpoint. Saves are already live; never
-  // re-import an old draft and resurrect a deleted advertisement.
-  const meta = readPublished().meta
-  let auditWarning = false
-  try { writeLog({ admin: req.admin, action: '核对已自动发布的配置', targetType: 'publish', detail: `v${meta.version}`, ip: clientIp(req) }) }
-  catch { auditWarning = true; console.warn('[config] published; audit log unavailable') }
-  res.json({ ok: true, published: true, meta, auditWarning })
+  const meta = publishAll()
+  writeLog({ admin: req.admin, action: '发布站点配置', targetType: 'publish', detail: `v${meta.version}`, ip: clientIp(req) })
+  res.json({ ok: true, meta })
 })
 
 app.post('/api/admin/discard-draft', requireAuth, requireWrite('publish'), (_req, res) => {
@@ -383,8 +866,8 @@ app.post('/api/admin/upload', requireAuth, requireWrite('upload'), upload.single
   const kind = String(req.query.kind || 'popup')
   const sub = kind === 'icon' ? 'icons' : kind === 'promo' ? 'promo' : 'popups'
   const url = `/uploads/${sub}/${req.file.filename}`
-  const auditWarning = logCommittedChange({ admin: req.admin, action: `上传素材 ${url}`, targetType: 'upload', targetId: url, ip: clientIp(req) })
-  res.json({ ok: true, url, auditWarning })
+  writeLog({ admin: req.admin, action: `上传素材 ${url}`, targetType: 'upload', targetId: url, ip: clientIp(req) })
+  res.json({ ok: true, url })
 })
 
 app.get('/api/admin/logs', requireAuth, requireRead('logs'), (req, res) => {
@@ -422,8 +905,6 @@ app.get('/api/admin/stats', requireAuth, requireRead('stats'), (_req, res) => {
 })
 
 app.post('/api/admin/totp/setup', requireAuth, requireWrite('settings'), async (req, res) => {
-  const current = getDb().prepare('SELECT totp_enabled FROM admins WHERE id = ?').get(req.admin.id)
-  if (current?.totp_enabled) return res.status(409).json({ error: '请先使用当前验证码关闭二次验证，再重新设置' })
   const totp = await loadTotp()
   const secret = totp.generateSecret()
   getDb().prepare('UPDATE admins SET totp_secret = ?, totp_enabled = 0, updated_at = ? WHERE id = ?').run(secret, now(), req.admin.id)
@@ -460,15 +941,7 @@ app.post('/api/admin/totp/disable', requireAuth, requireWrite('settings'), async
 app.use(express.static(PUBLIC_DIR))
 
 app.use((err, _req, res, _next) => {
-  // MulterError 不带 HTTP status：LIMIT_*/INVALID_FIELD_NAME 由客户端请求触发按 400 返回，
-  // STREAM_DESTROYED 属存储侧故障仍按 500。
-  const clientUploadError = err instanceof multer.MulterError && err.code !== 'STREAM_DESTROYED'
-  const status = clientUploadError || err.status === 400 ? 400 : 500
-  res.status(status).json({
-    error: err?.message || 'server error',
-    ...(err.field ? { field: err.field } : {}),
-    ...(clientUploadError ? { code: err.code } : {}),
-  })
+  res.status(500).json({ error: err?.message || 'server error' })
 })
 
 app.listen(PORT, HOST, () => {
