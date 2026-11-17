@@ -40,6 +40,8 @@ const child = spawn(process.execPath, ['server.mjs'], {
   cwd: adminDir, stdio: ['ignore', 'pipe', 'pipe'],
   env: { ...process.env, ADMIN_HOST: '127.0.0.1', ADMIN_PORT: String(port), SITE_DATA_DIR: dataDir,
     UPLOAD_DIR: path.join(tmp, 'uploads'), ADMIN_DB_PATH: path.join(tmp, 'test.sqlite'),
+    // 生产必备签名密钥：缺失时签名/验签 fail closed，测试环境注入固定值
+    VIDEO_URL_SECRET: 'test-secret',
     ADMIN_BOOTSTRAP_USER: 'ad-sync-test', ADMIN_BOOTSTRAP_PASS: password },
 })
 let output = ''
@@ -113,7 +115,8 @@ try {
   let atomicBundle = (await request('/data/site-bundle.json')).value
   assert.equal(atomicBundle.tabs.mine.quickApps[0].name, 'Quick')
   assert.equal(atomicBundle.tabs.featured.ad.name, 'Featured')
-  for (const [file, key] of [['config', 'config'], ['popups', 'popups'], ['tabs', 'tabs'], ['api-session', 'apiSession'], ['meta', 'meta']]) {
+  // api-session.json 已从公共 /data/ 白名单移除（P0：上游 token 不可公开），只核对其余公开分片
+  for (const [file, key] of [['config', 'config'], ['popups', 'popups'], ['tabs', 'tabs'], ['meta', 'meta']]) {
     assert.deepEqual((await request('/data/' + file + '.json')).value, atomicBundle[key])
   }
   await request('/api/admin/slots/mineQuickApps', 'PUT', { items: [] })
