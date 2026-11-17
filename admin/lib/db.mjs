@@ -9,13 +9,24 @@ let db
 export function getDb() {
   if (db) return db
   ensureDirs()
-  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true })
+  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true, mode: 0o755 })
   db = new Database(DB_PATH)
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
   initSchema(db)
   seedAdmin(db)
+  sweepExpired(db)
+  // 每小时再清扫一次；unref 保证定时器不阻止进程退出
+  setInterval(() => {
+    try { sweepExpired(db) } catch {}
+  }, 60 * 60 * 1000).unref()
   return db
+}
+
+// 启动与周期清扫：删除已过期会话，以及客户已删除后遗留的孤儿令牌
+function sweepExpired(database) {
+  database.prepare('DELETE FROM sessions WHERE expires_at < ?').run(now())
+  database.prepare('DELETE FROM customer_tokens WHERE customer_id NOT IN (SELECT id FROM customers)').run()
 }
 
 function initSchema(database) {

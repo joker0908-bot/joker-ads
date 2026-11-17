@@ -15,7 +15,7 @@ export const PUBLIC_DIR = path.join(ADMIN_ROOT, 'public')
 
 export function ensureDirs() {
   for (const dir of [LIVE_DIR, DRAFT_DIR, UPLOAD_DIR, path.join(UPLOAD_DIR, 'popups'), path.join(UPLOAD_DIR, 'icons'), path.join(UPLOAD_DIR, 'promo')]) {
-    fs.mkdirSync(dir, { recursive: true })
+    fs.mkdirSync(dir, { recursive: true, mode: 0o755 })
   }
 }
 
