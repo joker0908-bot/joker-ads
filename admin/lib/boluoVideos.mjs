@@ -17,9 +17,17 @@ const DEFAULT_BASES = []
 const FETCH_MS = Math.max(2000, Number(process.env.BOLUO_FETCH_MS || 8000))
 const PLAY_TTL_SEC = Math.max(30, Number(process.env.VIDEO_PLAY_TTL_SEC || 300))
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+// 非流式上游响应体累积上限，防内存放大；代理媒体体放宽
+const MAX_BODY_BYTES = 64 * 1024 * 1024
+const MAX_MEDIA_BYTES = 256 * 1024 * 1024
+// 进程内 Map 缓存统一上限
+const CACHE_MAX_ENTRIES = 5000
+// 会话文件缓存 TTL，配合 mtime+size 变化即重读
+const SESSION_TTL_MS = 5000
 
 let sid = ''
 let activeBase = null
+let pickBasePromise = null
 const coverPathCache = new Map()
 
 function httpError(status, code, message) {
@@ -41,9 +49,25 @@ function bases() {
   return [...list.filter((b) => !isIp(b)), ...list.filter(isIp)]
 }
 
-function session() {
+// 上限保护：超过 CACHE_MAX_ENTRIES 时淘汰最老的一半（Map 按插入序迭代）
+function cacheSet(map, key, value) {
+  if (map.size >= CACHE_MAX_ENTRIES) {
+    const drop = Math.floor(CACHE_MAX_ENTRIES / 2)
+    let n = 0
+    for (const k of map.keys()) {
+      if (n >= drop) break
+      map.delete(k)
+      n += 1
+    }
+  }
+  map.set(key, value)
+}
+
+let sessionCache = { mtimeMs: -1, size: -1, at: 0, value: null }
+
+function readSessionFile(file) {
   try {
-    const raw = JSON.parse(fs.readFileSync(path.join(LIVE_DIR, 'api-session.json'), 'utf8'))
+    const raw = JSON.parse(fs.readFileSync(file, 'utf8'))
     return {
       token: String(raw?.token || '').trim(),
       resBase: String(raw?.resBase || DEFAULT_RES_BASE).trim().replace(/\/$/, '') || DEFAULT_RES_BASE,
@@ -51,6 +75,24 @@ function session() {
   } catch {
     return { token: '', resBase: DEFAULT_RES_BASE }
   }
+}
+
+function session() {
+  const file = path.join(LIVE_DIR, 'api-session.json')
+  let stat = null
+  try { stat = fs.statSync(file) } catch { /* 文件缺失按未缓存处理 */ }
+  const mtimeMs = stat ? stat.mtimeMs : -1
+  const size = stat ? stat.size : -1
+  const now = Date.now()
+  if (sessionCache.value
+    && sessionCache.mtimeMs === mtimeMs
+    && sessionCache.size === size
+    && now - sessionCache.at < SESSION_TTL_MS) {
+    return sessionCache.value
+  }
+  const value = readSessionFile(file)
+  sessionCache = { mtimeMs, size, at: now, value }
+  return value
 }
 
 export function configured() {
@@ -61,7 +103,7 @@ function isIpUrl(u) {
   try { return /^\d{1,3}(\.\d{1,3}){3}$/.test(new URL(u).hostname) } catch { return false }
 }
 
-function httpGet(url, { headers = {}, timeout = FETCH_MS, stream = false } = {}) {
+function httpGet(url, { headers = {}, timeout = FETCH_MS, stream = false, maxBytes = MAX_BODY_BYTES } = {}) {
   return new Promise((resolve, reject) => {
     let u
     try { u = new URL(url) } catch { return reject(httpError(502, 'upstream', '加载失败，请检查网络后重试')) }
@@ -73,7 +115,17 @@ function httpGet(url, { headers = {}, timeout = FETCH_MS, stream = false } = {})
     }, (res) => {
       if (stream) return resolve(res)
       const chunks = []
-      res.on('data', (d) => chunks.push(d))
+      let received = 0
+      res.on('data', (d) => {
+        received += d.length
+        // 体积累积超限立即断开，防上游放大内存
+        if (received > maxBytes) {
+          req.destroy()
+          reject(httpError(502, 'upstream', '加载失败，请检查网络后重试'))
+          return
+        }
+        chunks.push(d)
+      })
       res.on('end', () => resolve({
         status: res.statusCode,
         headers: res.headers,
@@ -112,15 +164,24 @@ async function handshake(base) {
 }
 
 async function pickBase() {
-  for (const base of bases()) {
+  // 单飞：已有进行中的握手直接复用同一 promise，避免并发请求重复握手互踩
+  if (pickBasePromise) return pickBasePromise
+  pickBasePromise = (async () => {
     try {
-      if (await handshake(base)) {
-        activeBase = base
-        return base
+      for (const base of bases()) {
+        try {
+          if (await handshake(base)) {
+            activeBase = base
+            return base
+          }
+        } catch {}
       }
-    } catch {}
-  }
-  throw httpError(502, 'upstream', '加载失败，请检查网络后重试')
+      throw httpError(502, 'upstream', '加载失败，请检查网络后重试')
+    } finally {
+      pickBasePromise = null
+    }
+  })()
+  return pickBasePromise
 }
 
 async function api(pathName, { retry = true } = {}) {
@@ -129,8 +190,10 @@ async function api(pathName, { retry = true } = {}) {
   const base = activeBase || (await pickBase())
   const sep = pathName.includes('?') ? '&' : '?'
   const url = `${base}/api/v1${pathName}${pathName.includes('pid=') ? '' : `${sep}pid=${PID}`}`
+  // 发出前把全局 sid 捕获到局部变量，防止请求在途期间被其他响应换掉
+  const sidAtSend = sid
   const got = await httpGet(url, {
-    headers: { Accept: 'application/json', t: '3', k: '3', sid, token },
+    headers: { Accept: 'application/json', t: '3', k: '3', sid: sidAtSend, token },
   })
   if (got.status !== 200) {
     if (activeBase) { activeBase = null }
@@ -204,7 +267,7 @@ export async function listVideos({ page, pageSize, size, sort, q, tag } = {}) {
   await catalog.ensureCatalog(api)
   const res = catalog.queryVideos({ page, pageSize: pageSize || size, sort, q, tag })
   for (const v of res.rows) {
-    if (v.id && v.coverURL) coverPathCache.set(String(v.id), String(v.coverURL))
+    if (v.id && v.coverURL) cacheSet(coverPathCache, String(v.id), String(v.coverURL))
   }
   return {
     items: res.rows.filter((v) => v && v.id && v.name).map(mapVideo),
@@ -223,7 +286,7 @@ export async function getVideo(id) {
   const data = await api(`/videos/${encodeURIComponent(vid)}`)
   const v = data?.video || {}
   if (!v.id) throw httpError(404, 'not_found', '该视频暂不可用')
-  if (v.coverURL) coverPathCache.set(vid, String(v.coverURL))
+  if (v.coverURL) cacheSet(coverPathCache, vid, String(v.coverURL))
   const playUrl = String(data?.url || '')
   const previewUrl = String(data?.previewUrl || '')
   const related = Array.isArray(data?.otherVideos)
@@ -249,9 +312,17 @@ function videoSecret() {
   return String(process.env.VIDEO_URL_SECRET || '')
 }
 
+// 显式允许时才退回无密钥的 dev 签名（仅测试用），否则 fail closed
+function devUnsignedAllowed() {
+  return process.env.ALLOW_DEV_UNSIGNED === '1'
+}
+
 function signSeg(url, exp) {
-  const key = videoSecret() || 'dev-only-unsigned'
-  return crypto.createHmac('sha256', key).update(`vseg.${url}.${exp}`).digest('hex')
+  const key = videoSecret()
+  if (!key && !devUnsignedAllowed()) {
+    throw httpError(503, 'config', '服务未配置')
+  }
+  return crypto.createHmac('sha256', key || 'dev-only-unsigned').update(`vseg.${url}.${exp}`).digest('hex')
 }
 
 export function segUrl(target, exp) {
@@ -259,6 +330,10 @@ export function segUrl(target, exp) {
 }
 
 export function verifySeg(target, exp, sig) {
+  // 密钥未配置且未显式允许 dev 模式时，不可能存在合法签名，视同验签失败
+  if (!videoSecret() && !devUnsignedAllowed()) {
+    throw httpError(410, 'expired', '播放地址已失效，请返回重试')
+  }
   const expN = Number(exp)
   const now = Math.floor(Date.now() / 1000)
   if (!Number.isFinite(expN) || expN < now) {
@@ -295,8 +370,9 @@ export async function writePlaylist(id, mode, res) {
   const target = detail._playUrl || detail._previewUrl
   if (!target) throw httpError(404, 'not_found', '该视频暂不可用')
   const { token } = session()
+  const sidAtSend = sid
   const got = await httpGet(target, {
-    headers: { Accept: 'application/vnd.apple.mpegurl,*/*', t: '3', k: '3', sid, token },
+    headers: { Accept: 'application/vnd.apple.mpegurl,*/*', t: '3', k: '3', sid: sidAtSend, token },
   })
   const text = got.body.toString('utf8')
   if (got.status !== 200 || !text.includes('#EXTM3U')) {
@@ -325,15 +401,19 @@ function allowedProxyUrl(raw) {
   try { u = new URL(String(raw || '')) } catch { return null }
   if (u.protocol !== 'https:' && u.protocol !== 'http:') return null
   const host = u.hostname
-  if (!host || host === 'localhost' || host === '127.0.0.1' || host === '::1') return null
-  if (/^10\.|^192\.168\.|^172\.(1[6-9]|2\d|3[01])\.|^169\.254\./.test(host)) return null
+  const lower = host.toLowerCase()
+  if (!host || lower === 'localhost' || lower === '127.0.0.1' || lower === '[::1]' || lower === '::1') return null
+  // IPv4 内网/保留段：RFC1918、链路本地、CGNAT 100.64.0.0/10、全零段
+  if (/^0\.|^10\.|^192\.168\.|^172\.(1[6-9]|2\d|3[01])\.|^169\.254\.|^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(host)) return null
+  // IPv6（URL hostname 带方括号）：链路本地 fe80::/10、ULA fc00::/7、IPv4 映射地址
+  if (/^\[fe[89ab]/i.test(host) || /^\[f[cd]/i.test(host) || lower.startsWith('[::ffff:')) return null
   return u
 }
 
 export async function proxyMedia(target, res) {
   const u = allowedProxyUrl(target)
   if (!u) throw httpError(403, 'forbidden', '该视频暂不可用')
-  const upstream = await httpGet(u.href)
+  const upstream = await httpGet(u.href, { maxBytes: MAX_MEDIA_BYTES })
   const text = upstream.body.toString('utf8')
   const isM3u8 = /m3u8|mpegurl/i.test(String(upstream.headers['content-type'] || ''))
     || text.startsWith('#EXTM3U')
@@ -416,7 +496,7 @@ export async function listShorts({ page, pageSize } = {}) {
   for (const row of rows) {
     const v = row?.video || row
     if (!v?.id || !(v.name || v.title)) continue
-    if (v.coverURL) coverPathCache.set(String(v.id), String(v.coverURL))
+    if (v.coverURL) cacheSet(coverPathCache, String(v.id), String(v.coverURL))
     items.push(mapVideo(v))
   }
   return { items, page: Math.max(1, Number(page) || 1), pageSize: items.length }
@@ -440,7 +520,7 @@ export async function listVideoCategories() {
 
 export function mapSkit(row) {
   const id = String(row?.serial_id || row?.id || '')
-  if (row?.coverURL) skitCoverCache.set(id, String(row.coverURL))
+  if (row?.coverURL) cacheSet(skitCoverCache, id, String(row.coverURL))
   return {
     id,
     title: String(row?.name || ''),
@@ -472,7 +552,8 @@ export async function listSkitCategories() {
   const list = rows
     .map((c) => ({ id: String(c?.id || c?.categoryId || ''), name: String(c?.name || '') }))
     .filter((c) => c.id || c.name)
-  if (list.length) skitCategories = { at: Date.now(), list }
+  // 分类列表也加上限保护，防异常上游灌爆内存
+  if (list.length) skitCategories = { at: Date.now(), list: list.slice(0, CACHE_MAX_ENTRIES) }
   return list
 }
 
@@ -561,8 +642,9 @@ export async function writeSkitPlaylist(serialId, epId, mode, res) {
     || episodes.find((e) => e.unlocked)
   if (!ep?.id || !ep._url) throw httpError(404, 'not_found', '该视频暂不可用')
   const { token } = session()
+  const sidAtSend = sid
   const got = await httpGet(ep._url, {
-    headers: { Accept: 'application/vnd.apple.mpegurl,*/*', t: '3', k: '3', sid, token },
+    headers: { Accept: 'application/vnd.apple.mpegurl,*/*', t: '3', k: '3', sid: sidAtSend, token },
   })
   const text = got.body.toString('utf8')
   if (got.status !== 200 || !text.includes('#EXTM3U')) {
@@ -615,4 +697,5 @@ export function clearBoluoState() {
   sid = ''
   activeBase = null
   coverPathCache.clear()
+  sessionCache = { mtimeMs: -1, size: -1, at: 0, value: null }
 }

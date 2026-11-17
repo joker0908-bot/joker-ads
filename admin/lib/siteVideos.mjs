@@ -17,11 +17,16 @@ export function mediaDir() {
   return MEDIA_DIR
 }
 
+// 目录文件缓存 TTL，配合 mtime+size 变化即重读
+const CATALOG_TTL_MS = 5000
+
 function videoSecret() {
   return String(process.env.VIDEO_URL_SECRET || '')
 }
 
-function loadCatalog() {
+let catalogCache = { mtimeMs: -1, size: -1, at: 0, value: null }
+
+function readCatalogFile() {
   try {
     if (!fs.existsSync(CATALOG_PATH)) return { categories: [], videos: [] }
     const raw = JSON.parse(fs.readFileSync(CATALOG_PATH, 'utf8'))
@@ -38,6 +43,23 @@ function loadCatalog() {
   } catch {
     return { categories: [], videos: [] }
   }
+}
+
+function loadCatalog() {
+  let stat = null
+  try { stat = fs.statSync(CATALOG_PATH) } catch { /* 文件缺失按未缓存处理 */ }
+  const mtimeMs = stat ? stat.mtimeMs : -1
+  const size = stat ? stat.size : -1
+  const now = Date.now()
+  if (catalogCache.value
+    && catalogCache.mtimeMs === mtimeMs
+    && catalogCache.size === size
+    && now - catalogCache.at < CATALOG_TTL_MS) {
+    return catalogCache.value
+  }
+  const value = readCatalogFile()
+  catalogCache = { mtimeMs, size, at: now, value }
+  return value
 }
 
 export function formatDuration(sec) {
@@ -128,10 +150,17 @@ export async function listVideos(query = {}) {
   )
 }
 
+// 显式允许时才退回无密钥的 dev 签名（仅测试用），否则 fail closed
+function devUnsignedAllowed() {
+  return process.env.ALLOW_DEV_UNSIGNED === '1'
+}
+
 function sign(id, exp) {
   const secret = videoSecret()
-  const key = secret || 'dev-only-unsigned'
-  return crypto.createHmac('sha256', key).update(`${id}.${exp}`).digest('hex')
+  if (!secret && !devUnsignedAllowed()) {
+    throw httpError(503, 'config', '服务未配置')
+  }
+  return crypto.createHmac('sha256', secret || 'dev-only-unsigned').update(`${id}.${exp}`).digest('hex')
 }
 
 function httpError(status, code, message) {
@@ -253,6 +282,10 @@ export async function writeSegment(id, rel, res) {
 }
 
 export function verifyPlayToken(id, exp, sig) {
+  // 密钥未配置且未显式允许 dev 模式时，不可能存在合法签名，视同验签失败
+  if (!videoSecret() && !devUnsignedAllowed()) {
+    throw httpError(410, 'expired', '播放地址已失效，请返回重试')
+  }
   const expN = Number(exp)
   const now = Math.floor(Date.now() / 1000)
   if (!Number.isFinite(expN) || expN < now) {
