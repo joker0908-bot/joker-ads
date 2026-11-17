@@ -40,6 +40,10 @@ jobs:
         run: node scripts/test-ad-sync.mjs
       - name: Atomic snapshot fault and interruption regression
         run: node scripts/test-audit-config.mjs
+      - name: Live-only admin routes smoke test
+        run: node scripts/test-live-routes.mjs
+      - name: Stale snapshot cut-over regression
+        run: node scripts/test-live-migration.mjs
       - name: Reproduce exact production build
         env:
           AUDIT_BUNDLE_OUT: ${{ runner.temp }}/audit-release

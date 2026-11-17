@@ -1,5 +1,6 @@
 import crypto from 'node:crypto'
 import { getDb, now } from './db.mjs'
+import { walletView } from './wallet.mjs'
 
 export const SEED_NUMERIC = '1000147271297'
 export const SEED_CUSTOMER_ID = `DW${SEED_NUMERIC}`
@@ -50,13 +51,15 @@ function inviteCountOf(db, customerId) {
 }
 
 function publicCard(row, extras = {}) {
+  const customerId = row.customer_id || row.id
   return {
-    customerId: row.customer_id || row.id,
+    customerId,
     cardNo: row.card_no,
     inviteCode: row.invite_code,
     invitedBy: row.invited_by || '',
     status: row.status || 'active',
     issuedAt: row.issued_at || row.created_at,
+    ...walletView(customerId),
     ...extras,
   }
 }
@@ -185,9 +188,11 @@ export function listCustomers({ limit = 100, offset = 0 } = {}) {
   const db = getDb()
   const rows = db.prepare(`
     SELECT c.id, c.invite_code, c.invited_by, c.created_at, c.last_seen_at,
-           i.card_no, i.status, i.issued_at
+           i.card_no, i.status, i.issued_at,
+           COALESCE(w.diamonds, 0) AS diamonds, w.vip_until
     FROM customers c
     JOIN identity_cards i ON i.customer_id = c.id
+    LEFT JOIN customer_wallets w ON w.customer_id = c.id
     ORDER BY c.created_at DESC
     LIMIT ? OFFSET ?
   `).all(limit, offset)

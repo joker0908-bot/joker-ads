@@ -1,0 +1,10 @@
+/* 菠萝视频 purple holographic theme override for the admin (in-place rebrand) */
+:root{--red:#ff4fd8;--bg:#0b0716;--bg2:#120b20;--bg3:#170f2a;--border:rgba(186,130,255,.22);--border2:rgba(186,130,255,.34);--text:#f7f3ff;--muted:rgba(247,243,255,.6);--blue:#8ab4ff;
+--bl-grad:linear-gradient(115deg,#ffe56a 0%,#ff4fd8 42%,#8a5cff 72%,#4c8dff 100%);--bl-glow:0 0 0 1px rgba(255,229,106,.4),0 0 14px rgba(255,79,216,.4)}
+.btn-login,.btn-primary{background:var(--bl-grad);color:#1a0b16;box-shadow:var(--bl-glow)}
+.nav-item.active{background:rgba(255,79,216,.08)}
+.badge-red{background:rgba(255,79,216,.15)}
+.drop-zone:hover,.drop-zone.dragover,.drop-zone:focus{background:rgba(255,79,216,.06)}
+input,select,textarea,select option,#user-badge,.promo-fallback,.list-row,.source-item{background:#1a1230}
+.drop-zone,.upload-status{background:#140c26}
+.topbar-title,.login-box h2{background:var(--bl-grad);-webkit-background-clip:text;background-clip:text;color:transparent}

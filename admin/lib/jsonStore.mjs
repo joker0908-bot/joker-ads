@@ -37,15 +37,28 @@ export function writeJsonAtomic(target, value, backup = true) {
     } catch { console.warn('[config] directory sync unavailable after atomic commit') }
   }
 }
+function importLive(backup) {
+  const first = {}
+  for (const [file, key] of Object.entries(KEYS)) {
+    const p = path.join(LIVE_DIR, file)
+    first[key] = fs.existsSync(p) ? strictJson(p) : key === 'meta' ? { version: 0 } : {}
+  }
+  validatePublished(first)
+  writeJsonAtomic(SNAPSHOT, first, backup) // import only LIVE, never draft.
+}
+function liveMetaVersion() {
+  const meta = readJson(path.join(LIVE_DIR, 'meta.json'))
+  return Number.isSafeInteger(meta?.version) ? meta.version : 0
+}
 export function readPublished() {
-  if (!fs.existsSync(SNAPSHOT)) {
-    const first = {}
-    for (const [file, key] of Object.entries(KEYS)) {
-      const p = path.join(LIVE_DIR, file)
-      first[key] = fs.existsSync(p) ? strictJson(p) : key === 'meta' ? { version: 0 } : {}
-    }
-    validatePublished(first)
-    writeJsonAtomic(SNAPSHOT, first, false) // import only LIVE, never draft.
+  if (!fs.existsSync(SNAPSHOT)) importLive(false)
+  else {
+    const snapshot = validatePublished(strictJson(SNAPSHOT))
+    // The file-per-part live directory was the authority while the pre-snapshot
+    // admin ran in production. If it moved past the snapshot, it holds what users
+    // actually see: re-import it once (the stale snapshot goes to private-backups).
+    if (liveMetaVersion() <= Number(snapshot.meta?.version || 0)) return snapshot
+    importLive(true)
   }
   return validatePublished(strictJson(SNAPSHOT))
 }

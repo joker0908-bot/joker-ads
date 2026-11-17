@@ -20,6 +20,16 @@ import { addAppPlacement, updateAppPlacements } from './lib/appPlacements.mjs'
 import { getDb, id, now, hashPassword, writeLog } from './lib/db.mjs'
 import { claimCustomer, readCustomerByToken, listCustomers, cardCookie, CARD_COOKIE } from './lib/customers.mjs'
 import {
+  publicCatalog,
+  reserveOrder,
+  attachPayOrder,
+  failPayOrder,
+  creditPaidOrder,
+  listCustomerOrders,
+  redeemVipDays,
+  REDEEM_RULE,
+} from './lib/wallet.mjs'
+import {
   requireAuth,
   requireRead,
   requireWrite,
@@ -32,6 +42,21 @@ import {
   sessionCookie,
   loadTotp,
 } from './lib/auth.mjs'
+import {
+  getVideo,
+  isHuangguoId,
+  listCategories,
+  listVideos,
+  mediaFileFor,
+  mimeFor,
+  verifyPlayToken,
+  writeCover,
+  writePlaylist,
+  writeSegment,
+} from './lib/siteVideos.mjs'
+import * as dewuApi from './lib/dewuApi.mjs'
+import * as dewuVideos from './lib/dewuVideos.mjs'
+import { createDramaApiKey, deleteDramaApiKey, dramaKeyAllows, listDramaApiKeys, setDramaApiKeyPaused, touchKeyUsed } from './lib/dramaApiKey.mjs'
 
 const HOST = process.env.ADMIN_HOST || '127.0.0.1'
 const PORT = Number(process.env.ADMIN_PORT || 8790)
@@ -151,6 +176,403 @@ app.get('/api/public/customers/me', (req, res) => {
   res.json({ ok: true, ...row })
 })
 
+function payInternalOk(req) {
+  const expected = String(process.env.PAY_INTERNAL_TOKEN || '')
+  const got = String(req.get('x-pay-internal') || '')
+  if (!expected || expected.length < 16 || got.length !== expected.length) return false
+  return crypto.timingSafeEqual(Buffer.from(got), Buffer.from(expected))
+}
+
+function customerFromPayBody(req) {
+  const token = String(req.body?.cardToken || cookies(req)[CARD_COOKIE] || '')
+  return readCustomerByToken(token)
+}
+
+function videoError(res, e) {
+  const status = Number(e?.status) || 500
+  res.status(status).json({
+    ok: false,
+    error: e?.message || '加载失败',
+    code: e?.code || 'upstream',
+  })
+}
+
+function dewuError(res, e) {
+  const status = Number(e?.status) || 500
+  res.status(status).json({
+    code: status,
+    message: e?.message || '加载失败',
+    error: e?.code || 'upstream',
+  })
+}
+
+function dewuCors(req, res, next) {
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Accept, Content-Type, X-Api-Key, Authorization')
+  if (req.method === 'OPTIONS') return res.status(204).end()
+  next()
+}
+
+function requireSuper(req, res, next) {
+  if (req.admin?.role !== 'super') return res.status(403).json({ error: '仅超管可操作' })
+  next()
+}
+
+function readRequestKey(req) {
+  const header = String(req.headers['x-api-key'] || '').trim()
+  if (header) return header
+  const auth = String(req.headers.authorization || '').trim()
+  if (/^bearer\s+/i.test(auth)) return auth.replace(/^bearer\s+/i, '').trim()
+  return String(req.query.key || '').trim()
+}
+
+const dewuRateLimit = new Map()
+const DEWU_RATE_PER_MIN = Math.max(30, Number(process.env.DEWU_API_RATE_PER_MIN || 300))
+
+function dewuRateOk(key) {
+  const now = Date.now()
+  let row = dewuRateLimit.get(key)
+  if (!row || now - row.windowStart > 60_000) {
+    row = { windowStart: now, count: 0 }
+    dewuRateLimit.set(key, row)
+  }
+  row.count += 1
+  if (dewuRateLimit.size > 5000) {
+    for (const [k, v] of dewuRateLimit) {
+      if (now - v.windowStart > 120_000) dewuRateLimit.delete(k)
+    }
+  }
+  return row.count <= DEWU_RATE_PER_MIN
+}
+
+function dewuRequireKey(req, res, next) {
+  if (req.method === 'OPTIONS') return next()
+  if (req.path === '/api/seg' || req.path === '/api/vseg') return next()
+  const key = readRequestKey(req)
+  if (!dramaKeyAllows(key, 'dewu')) {
+    return res.status(401).json({ code: 401, message: '需要 API Key', error: 'unauthorized' })
+  }
+  touchKeyUsed(key)
+  if (!dewuRateOk(key)) {
+    return res.status(429).json({ code: 429, message: '请求过于频繁', error: 'rate_limited' })
+  }
+  next()
+}
+
+app.use('/dewu-api', dewuCors)
+app.use('/dewu-api', dewuRequireKey)
+
+app.get('/dewu-api/api/shows', async (req, res) => {
+  try {
+    res.json({ code: 200, data: await dewuApi.listShows({ size: req.query.size }) })
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/show/:id', async (req, res) => {
+  try {
+    res.json({ code: 200, data: await dewuApi.getShow(req.params.id) })
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/cover/:id', async (req, res) => {
+  try {
+    const ok = await dewuApi.writeShowCover(req.params.id, res)
+    if (!ok) return res.status(404).json({ code: 404, message: '该视频暂不可用', error: 'not_found' })
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/seg', async (req, res) => {
+  try {
+    const ok = await dewuApi.writeShowSegment(req.query.id, req.query.p, req.query.exp, req.query.sig, res)
+    if (!ok) return res.status(404).json({ code: 404, message: '该视频暂不可用', error: 'unavailable' })
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/video/:id/:epId', async (req, res) => {
+  try {
+    await dewuApi.writePlaylist(req.params.id, req.params.epId, res)
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/videos', async (req, res) => {
+  try {
+    const out = await dewuVideos.listVideos(req.query)
+    res.json({
+      code: 200,
+      data: out.items,
+      total: out.total,
+      page: out.page,
+      pageSize: out.pageSize,
+      enriched: out.enriched,
+      complete: out.complete,
+      updatedAt: out.updatedAt,
+    })
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/videos/tags', async (req, res) => {
+  try {
+    res.json({ code: 200, data: await dewuVideos.listVideoTags() })
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/videos/categories', async (req, res) => {
+  try {
+    res.json({ code: 200, data: await dewuVideos.listVideoCategories() })
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/shorts', async (req, res) => {
+  try {
+    const out = await dewuVideos.listShorts(req.query)
+    res.json({ code: 200, data: out.items, page: out.page, pageSize: out.pageSize })
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/skits', async (req, res) => {
+  try {
+    const out = await dewuVideos.listSkits(req.query)
+    res.json({
+      code: 200,
+      data: out.items,
+      total: out.total,
+      page: out.page,
+      pageSize: out.pageSize,
+      complete: out.complete,
+      updatedAt: out.updatedAt,
+    })
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/skits/tags', async (req, res) => {
+  try {
+    res.json({ code: 200, data: await dewuVideos.listSkitTags() })
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/skits/categories', async (req, res) => {
+  try {
+    res.json({ code: 200, data: await dewuVideos.listSkitCategories() })
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/skits/:id/play', async (req, res) => {
+  try {
+    await dewuVideos.writeSkitPlaylist(req.params.id, req.query.ep, req.query.mode, res)
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/skits/:id/cover', async (req, res) => {
+  try {
+    const ok = await dewuVideos.writeSkitCover(req.params.id, res)
+    if (!ok) return res.status(404).json({ code: 404, message: '该视频暂不可用', error: 'not_found' })
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/skits/:id', async (req, res) => {
+  try {
+    res.json({ code: 200, data: await dewuVideos.getSkit(req.params.id) })
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/videos/:id/play', async (req, res) => {
+  try {
+    await dewuVideos.writePlaylist(req.params.id, req.query.mode, res)
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/videos/:id/cover', async (req, res) => {
+  try {
+    const ok = await dewuVideos.writeCover(req.params.id, res)
+    if (!ok) return res.status(404).json({ code: 404, message: '该视频暂不可用', error: 'not_found' })
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/vseg', async (req, res) => {
+  try {
+    dewuVideos.verifySeg(req.query.u, req.query.exp, req.query.sig)
+    await dewuVideos.proxyMedia(req.query.u, res)
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/dewu-api/api/videos/:id', async (req, res) => {
+  try {
+    const detail = await dewuVideos.getVideo(req.params.id)
+    const { _playUrl, _previewUrl, _coverPath, ...pub } = detail
+    res.json({ code: 200, data: pub })
+  } catch (e) {
+    dewuError(res, e)
+  }
+})
+
+app.get('/api/public/videos/categories', async (_req, res) => {
+  try {
+    res.json({ ok: true, categories: await listCategories() })
+  } catch (e) {
+    videoError(res, e)
+  }
+})
+
+app.get('/api/public/videos', async (req, res) => {
+  try {
+    res.json(await listVideos({
+      category: req.query.category,
+      q: req.query.q,
+      page: req.query.page,
+      pageSize: req.query.pageSize,
+    }))
+  } catch (e) {
+    videoError(res, e)
+  }
+})
+
+app.get('/api/public/videos/:id/media', async (req, res) => {
+  try {
+    verifyPlayToken(req.params.id, req.query.exp, req.query.sig)
+    if (isHuangguoId(req.params.id)) {
+      await writePlaylist(req.params.id, req.query.ep, req.query.exp, req.query.sig, res)
+      return
+    }
+    const file = mediaFileFor(req.params.id)
+    if (!file) return res.status(404).json({ ok: false, error: '该视频暂不可用', code: 'unavailable' })
+    res.setHeader('Cache-Control', 'private, no-store')
+    res.sendFile(file, { headers: { 'Content-Type': mimeFor(file) } })
+  } catch (e) {
+    videoError(res, e)
+  }
+})
+
+app.get('/api/public/videos/:id/seg', async (req, res) => {
+  try {
+    verifyPlayToken(req.params.id, req.query.exp, req.query.sig)
+    const ok = await writeSegment(req.params.id, req.query.p, res)
+    if (!ok) return res.status(404).json({ ok: false, error: '该视频暂不可用', code: 'unavailable' })
+  } catch (e) {
+    videoError(res, e)
+  }
+})
+
+app.get('/api/public/videos/:id/cover', async (req, res) => {
+  try {
+    const ok = await writeCover(req.params.id, res)
+    if (!ok) return res.status(404).json({ ok: false, error: '该视频暂不可用', code: 'not_found' })
+  } catch (e) {
+    videoError(res, e)
+  }
+})
+
+app.get('/api/public/videos/:id', async (req, res) => {
+  try {
+    res.json(await getVideo(req.params.id, { episode: req.query.ep }))
+  } catch (e) {
+    videoError(res, e)
+  }
+})
+
+app.get('/api/public/pay/catalog', (_req, res) => {
+  res.json({ ok: true, packages: publicCatalog(), redeem: REDEEM_RULE })
+})
+
+app.post('/api/public/pay/redeem', (req, res) => {
+  try {
+    const customer = customerFromPayBody(req)
+    if (!customer) return res.status(401).json({ ok: false, message: '请先领取身份卡' })
+    res.json(redeemVipDays({
+      customerId: customer.customerId,
+      days: req.body?.days,
+      requestId: req.body?.requestId,
+    }))
+  } catch (e) {
+    res.status(e.status || 400).json({ ok: false, message: e.message || '兑换失败' })
+  }
+})
+
+app.get('/api/public/pay/orders', (req, res) => {
+  const token = String(req.query.token || cookies(req)[CARD_COOKIE] || '')
+  const row = readCustomerByToken(token)
+  if (!row) return res.status(401).json({ ok: false, message: '请先领取身份卡' })
+  res.json({ ok: true, orders: listCustomerOrders(row.customerId) })
+})
+
+app.post('/api/internal/pay/reserve', (req, res) => {
+  if (!payInternalOk(req)) return res.status(403).json({ ok: false, message: 'forbidden' })
+  try {
+    const customer = customerFromPayBody(req)
+    if (!customer) return res.status(401).json({ ok: false, message: '请先领取身份卡' })
+    res.json({ ok: true, customerId: customer.customerId, ...reserveOrder({
+      customerId: customer.customerId,
+      packageId: req.body?.packageId,
+      productId: req.body?.productId,
+    }) })
+  } catch (e) {
+    res.status(e.status || 400).json({ ok: false, message: e.message || '下单失败' })
+  }
+})
+
+app.post('/api/internal/pay/attach', (req, res) => {
+  if (!payInternalOk(req)) return res.status(403).json({ ok: false, message: 'forbidden' })
+  try {
+    res.json(attachPayOrder({ mchOrderNo: req.body?.mchOrderNo, payOrderId: req.body?.payOrderId }))
+  } catch (e) {
+    res.status(e.status || 400).json({ ok: false, message: e.message || '记录失败' })
+  }
+})
+
+app.post('/api/internal/pay/fail', (req, res) => {
+  if (!payInternalOk(req)) return res.status(403).json({ ok: false, message: 'forbidden' })
+  res.json(failPayOrder({ mchOrderNo: req.body?.mchOrderNo, reason: req.body?.reason }))
+})
+
+app.post('/api/internal/pay/credit', (req, res) => {
+  if (!payInternalOk(req)) return res.status(403).json({ ok: false, message: 'forbidden' })
+  try {
+    res.json(creditPaidOrder({
+      mchOrderNo: req.body?.mchOrderNo,
+      payOrderId: req.body?.payOrderId,
+      amountFen: req.body?.amountFen,
+    }))
+  } catch (e) {
+    res.status(e.status || 400).json({ ok: false, message: e.message || '入账失败' })
+  }
+})
+
 app.get('/api/admin/customers', requireAuth, requireRead('customers'), (req, res) => {
   const limit = Math.min(200, Math.max(10, Number(req.query.limit || 50)))
   const offset = Math.max(0, Number(req.query.offset || 0))
@@ -206,6 +628,56 @@ app.get('/api/admin/dashboard', requireAuth, requireRead('dashboard'), (req, res
 
 app.get('/api/admin/site-config', requireAuth, requireRead('popups'), (_req, res) => {
   res.json(getBundle())
+})
+
+app.get('/api/admin/drama-api-keys', requireAuth, requireRead('settings'), requireSuper, (req, res) => {
+  writeLog({ admin: req.admin, action: '查看短剧 API Key', targetType: 'drama-api-key', ip: clientIp(req) })
+  res.json({ ok: true, keys: listDramaApiKeys() })
+})
+
+app.post('/api/admin/drama-api-keys', requireAuth, requireWrite('settings'), requireSuper, (req, res) => {
+  try {
+    const row = createDramaApiKey({ remark: req.body?.remark, scopes: req.body?.scopes })
+    writeLog({
+      admin: req.admin,
+      action: '新建短剧 API Key',
+      targetType: 'drama-api-key',
+      targetId: row.id,
+      detail: `${row.remark} ${row.scopes.join('+')}`,
+      ip: clientIp(req),
+    })
+    res.json({ ok: true, key: row })
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.status ? e.message : '创建失败' })
+  }
+})
+
+app.post('/api/admin/drama-api-keys/:id', requireAuth, requireWrite('settings'), requireSuper, (req, res) => {
+  const row = setDramaApiKeyPaused(req.params.id, req.body?.paused)
+  if (!row) return res.status(404).json({ error: '钥匙不存在' })
+  writeLog({
+    admin: req.admin,
+    action: row.paused ? '暂停短剧 API Key' : '恢复短剧 API Key',
+    targetType: 'drama-api-key',
+    targetId: row.id,
+    detail: row.remark,
+    ip: clientIp(req),
+  })
+  res.json({ ok: true })
+})
+
+app.delete('/api/admin/drama-api-keys/:id', requireAuth, requireWrite('settings'), requireSuper, (req, res) => {
+  const row = deleteDramaApiKey(req.params.id)
+  if (!row) return res.status(404).json({ error: '钥匙不存在' })
+  writeLog({
+    admin: req.admin,
+    action: '删除短剧 API Key',
+    targetType: 'drama-api-key',
+    targetId: row.id,
+    detail: row.remark,
+    ip: clientIp(req),
+  })
+  res.json({ ok: true })
 })
 
 app.get('/api/admin/api-session', requireAuth, requireRead('settings'), (_req, res) => {

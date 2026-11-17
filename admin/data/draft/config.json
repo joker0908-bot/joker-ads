@@ -1,6 +1,6 @@
 {
   "site": {
-    "name": "得污",
+    "name": "菠萝Y频",
     "tagline": "成人版",
     "logo": "/brand/logo.png"
   },
@@ -26,6 +26,11 @@
     }
   ],
   "tabbar": [
+    {
+      "id": "invite",
+      "label": "菠萝Y频",
+      "icon": "home"
+    },
     {
       "id": "apps",
       "label": "应用",
@@ -1064,7 +1069,7 @@
       "icon": "/icons/6ed465b9d1.gif"
     },
     {
-      "name": "小红书",
+      "name": "菠萝精选",
       "url": "",
       "icon": "/icons/ffd610f5af.png"
     },
@@ -1360,7 +1365,7 @@
   "promo": {
     "tag": "限时",
     "text": "聊天不限制",
-    "image": "/promo/banner.gif",
+    "image": "/promo/banner-qipai.gif",
     "cover": "web/static/00c4afc3c31171fc4db9f3c815865a1c.geb",
     "signUrl": "https://34.92.209.217/api/v1/ad/sign?s=FBI_698b40ead2bee8eef20a070f_40d0acbd-ad65-4aee-a6e7-f1eef6c926fc1786203544058_1000147271297&pid=FBI",
     "url": "https://60b.60pg0282.cc"
@@ -1553,7 +1558,7 @@
         "极品直播",
         "趣夜直播",
         "AI引擎",
-        "小红书",
+        "菠萝精选",
         "推特",
         "肉视频",
         "蜜桃视频",
@@ -1821,7 +1826,7 @@
         "QQ视频",
         "漫画直播",
         "AI引擎",
-        "小红书",
+        "菠萝精选",
         "推特",
         "肉视频",
         "蜜桃视频",
@@ -2057,7 +2062,7 @@
         "极品直播",
         "趣夜直播",
         "AI引擎",
-        "小红书",
+        "菠萝精选",
         "推特",
         "肉视频",
         "蜜桃视频",
@@ -2168,6 +2173,7 @@
   "internalRoutes": {
     "超嫩少女": "/short",
     "免费直播": "/videosPage",
+    "菠萝精选": "/videosPage",
     "小红书": "/videosPage",
     "推特": "/videosPage",
     "AI引擎": "/videosPage",
