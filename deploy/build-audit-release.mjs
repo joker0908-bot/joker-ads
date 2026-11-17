@@ -23,7 +23,9 @@ const files = ['admin/server.mjs', ...fs.readdirSync(path.join(root, 'admin/lib'
 fs.mkdirSync(out, { recursive: true })
 fs.writeFileSync(path.join(out, frontend), code)
 const manifest = { schema: 1, stage: config.stage, frontend, frontendSha256,
-  sourceDigest: digest(JSON.stringify(contract)), files: files.map(file => ({ source: file,
+  sourceDigest: digest(JSON.stringify(contract)),
+  ...(fs.existsSync(override) ? { frozen: true } : {}),
+  files: files.map(file => ({ source: file,
     target: file.startsWith('admin/') ? '/opt/ads-king/' + file : '/opt/ads-king/najin-pay-bff.mjs',
     sha256: digest(fs.readFileSync(path.join(root, file), 'utf8').replaceAll('\r\n', '\n')) })) }
 fs.writeFileSync(path.join(out, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n')
