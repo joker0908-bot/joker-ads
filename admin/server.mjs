@@ -97,6 +97,31 @@ const upload = multer({
   },
 })
 
+// 上传后按 magic bytes 复核真实图片类型：扩展名与 MIME 都由客户端控制，不可信。
+// 返回识别出的格式名；识别失败返回 null，由调用方删除落盘文件并拒绝。
+function sniffImageExt(filePath) {
+  const head = Buffer.alloc(12)
+  let len = 0
+  try {
+    const fd = fs.openSync(filePath, 'r')
+    try {
+      len = fs.readSync(fd, head, 0, head.length, 0)
+    } finally {
+      fs.closeSync(fd)
+    }
+  } catch {
+    return null
+  }
+  const ascii = (start, n) => head.subarray(start, start + n).toString('latin1')
+  if (len >= 3 && head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff) return 'jpeg'
+  if (len >= 4 && head.readUInt32BE(0) === 0x89504e47) return 'png'
+  if (len >= 6 && (ascii(0, 6) === 'GIF87a' || ascii(0, 6) === 'GIF89a')) return 'gif'
+  if (len >= 12 && ascii(0, 4) === 'RIFF' && ascii(8, 4) === 'WEBP') return 'webp'
+  // AVIF 是 ISOBMFF 容器：offset 4 为 'ftyp'，major brand 为 avif（avis 为图像序列）
+  if (len >= 12 && ascii(4, 4) === 'ftyp' && (ascii(8, 4) === 'avif' || ascii(8, 4) === 'avis')) return 'avif'
+  return null
+}
+
 function seedFromRepoIfEmpty() {
   const liveConfig = path.join(LIVE_DIR, 'config.json')
   if (fs.existsSync(liveConfig)) return
@@ -138,20 +163,38 @@ readPublished()
 app.get('/data/:file', (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
   if (req.params.file === 'site-bundle.json') return res.json(readPublished())
-  if (!/^(config|popups|tabs|meta|api-session)\.json$/.test(req.params.file)) return res.sendStatus(404)
+  // 安全基线：api-session.json 含上游 API token，绝不能通过公开路由暴露
+  if (!/^(config|popups|tabs|meta)\.json$/.test(req.params.file)) return res.sendStatus(404)
   res.json(readLive(req.params.file))
 })
 app.use('/data', (_req, res) => res.sendStatus(404))
 
-app.use('/uploads', express.static(UPLOAD_DIR, { etag: true, maxAge: '30d' }))
+app.use('/uploads', express.static(UPLOAD_DIR, {
+  etag: true,
+  maxAge: '30d',
+  // 上传目录一律 nosniff：阻止浏览器按内容嗅探把伪装文件当脚本/样式执行
+  setHeaders(res) {
+    res.setHeader('X-Content-Type-Options', 'nosniff')
+  },
+}))
+
+// 客户身份卡 token：只认 X-Card-Token / Authorization: Bearer 头或 dw_card HttpOnly cookie。
+// query 里的 ?token= 一律忽略——出现在 URL 的 token 会落访问日志和 Referer，等同泄漏。
+function readCardToken(req) {
+  const header = String(req.get('x-card-token') || '').trim()
+  if (header) return header
+  const auth = String(req.get('authorization') || '').trim()
+  if (/^bearer\s+/i.test(auth)) return auth.replace(/^bearer\s+/i, '').trim()
+  return String(cookies(req)[CARD_COOKIE] || '')
+}
 
 app.post('/api/public/customers/claim', (req, res) => {
   try {
-    const cookieToken = cookies(req)[CARD_COOKIE] || ''
     const result = claimCustomer({
       deviceFp: req.body?.deviceFp,
       inviteCode: req.body?.inviteCode,
-      cardToken: String(req.body?.cardToken || cookieToken || ''),
+      // body.cardToken 保留；其余渠道只走头/cookie，不认 query
+      cardToken: String(req.body?.cardToken || readCardToken(req) || ''),
     })
     res.setHeader('Set-Cookie', cardCookie(result.token, req))
     res.json({
@@ -170,7 +213,8 @@ app.post('/api/public/customers/claim', (req, res) => {
 })
 
 app.get('/api/public/customers/me', (req, res) => {
-  const token = String(req.query.token || cookies(req)[CARD_COOKIE] || '')
+  // GET 端点不再接受 ?token=：身份卡 token 走 URL 会进日志/Referer 泄漏
+  const token = readCardToken(req)
   const row = readCustomerByToken(token)
   if (!row) return res.status(404).json({ error: '未找到身份卡' })
   res.json({ ok: true, ...row })
@@ -184,7 +228,8 @@ function payInternalOk(req) {
 }
 
 function customerFromPayBody(req) {
-  const token = String(req.body?.cardToken || cookies(req)[CARD_COOKIE] || '')
+  // POST 端点保留 body.cardToken；其余照旧走头/cookie，query token 不认
+  const token = String(req.body?.cardToken || readCardToken(req) || '')
   return readCustomerByToken(token)
 }
 
@@ -219,11 +264,22 @@ function requireSuper(req, res, next) {
   next()
 }
 
+// juhe 聚合后端遗留挂载仅存在于 /dewu-api 前缀，只有经该前缀到达的请求才放行 ?key=。
+// 注意：生产 nginx 目前把 /dewu-api 重写为 /boluo-api 再转发，Express 端 originalUrl
+// 看不到原前缀；如需真正放行遗留 query key，转发层须透传原始 URI（X-Original-URI 等）。
+// 伪造该头最坏只是让客户端用自己的 key 走 query，不构成提权。
+function dewuLegacyPath(req) {
+  const candidates = [req.baseUrl, req.originalUrl, req.get('x-original-uri'), req.get('x-forwarded-uri')]
+  return candidates.some((u) => String(u || '').startsWith('/dewu-api'))
+}
+
 function readRequestKey(req) {
   const header = String(req.headers['x-api-key'] || '').trim()
   if (header) return header
   const auth = String(req.headers.authorization || '').trim()
   if (/^bearer\s+/i.test(auth)) return auth.replace(/^bearer\s+/i, '').trim()
+  // ?key= 只在 /dewu-api 遗留挂载放行；/boluo-api 必须走头，防 key 落 URL 日志
+  if (!dewuLegacyPath(req)) return ''
   return String(req.query.key || '').trim()
 }
 
@@ -244,6 +300,33 @@ function boluoRateOk(key) {
     }
   }
   return row.count <= BOLUO_RATE_PER_MIN
+}
+
+// 公开端点的进程内固定窗口限流（按客户端 IP）。Map 超上限先清过期窗口、
+// 再淘汰最老条目（Map 按插入序遍历），防海量 IP 把内存打爆；进程重启计数清零，属软防护。
+const publicRateBuckets = new Map()
+const PUBLIC_RATE_MAX_KEYS = 10_000
+
+function publicRateOk(name, req, perMin) {
+  const now = Date.now()
+  const key = `${name}:${clientIp(req) || 'unknown'}`
+  let row = publicRateBuckets.get(key)
+  if (!row || now - row.windowStart > 60_000) {
+    row = { windowStart: now, count: 0 }
+    publicRateBuckets.set(key, row)
+  }
+  row.count += 1
+  if (publicRateBuckets.size > PUBLIC_RATE_MAX_KEYS) {
+    for (const [k, v] of publicRateBuckets) {
+      if (now - v.windowStart > 120_000) publicRateBuckets.delete(k)
+    }
+    while (publicRateBuckets.size > PUBLIC_RATE_MAX_KEYS) {
+      const oldest = publicRateBuckets.keys().next().value
+      if (oldest === undefined) break
+      publicRateBuckets.delete(oldest)
+    }
+  }
+  return row.count <= perMin
 }
 
 function boluoRequireKey(req, res, next) {
@@ -525,13 +608,18 @@ app.post('/api/public/pay/redeem', (req, res) => {
 })
 
 app.get('/api/public/pay/orders', (req, res) => {
-  const token = String(req.query.token || cookies(req)[CARD_COOKIE] || '')
+  // 同 customers/me：GET 端点不认 ?token=，防身份卡 token 经 URL 泄漏
+  const token = readCardToken(req)
   const row = readCustomerByToken(token)
   if (!row) return res.status(401).json({ ok: false, message: '请先领取身份卡' })
   res.json({ ok: true, orders: listCustomerOrders(row.customerId) })
 })
 
 app.post('/api/internal/pay/reserve', (req, res) => {
+  // 下单限流：每 IP 每分钟 20 次，先限流再验内部 token，防暴力探测与刷接口
+  if (!publicRateOk('pay-reserve', req, 20)) {
+    return res.status(429).json({ ok: false, message: '请求过于频繁' })
+  }
   if (!payInternalOk(req)) return res.status(403).json({ ok: false, message: 'forbidden' })
   try {
     const customer = customerFromPayBody(req)
@@ -580,6 +668,10 @@ app.get('/api/admin/customers', requireAuth, requireRead('customers'), (req, res
 })
 
 app.post('/api/public/ad-click', (req, res) => {
+  // 点击上报限流：每 IP 每分钟 60 次，防刷量打爆 ad_events 表
+  if (!publicRateOk('ad-click', req, 60)) {
+    return res.status(429).json({ ok: false, error: '请求过于频繁' })
+  }
   const db = getDb()
   db.prepare(`
     INSERT INTO ad_events (id, slot, item_name, event_type, url, ip, user_agent, created_at)
@@ -852,6 +944,11 @@ app.post('/api/admin/discard-draft', requireAuth, requireWrite('publish'), (_req
 
 app.post('/api/admin/upload', requireAuth, requireWrite('upload'), upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: '未收到文件' })
+  // magic bytes 复核不过即删除落盘文件并 400，防伪装脚本/马进入 /uploads
+  if (!sniffImageExt(req.file.path)) {
+    fs.rmSync(req.file.path, { force: true })
+    return res.status(400).json({ error: '文件内容不是有效图片' })
+  }
   const kind = String(req.query.kind || 'popup')
   const sub = kind === 'icon' ? 'icons' : kind === 'promo' ? 'promo' : 'popups'
   const url = `/uploads/${sub}/${req.file.filename}`
@@ -868,9 +965,15 @@ app.get('/api/admin/logs', requireAuth, requireRead('logs'), (req, res) => {
 app.get('/api/admin/logs/export', requireAuth, requireRead('logs'), (_req, res) => {
   const logs = getDb().prepare('SELECT * FROM operation_logs ORDER BY created_at DESC LIMIT 2000').all()
   const header = 'time,admin,action,target_type,target_id,detail,ip\n'
+  // 防 Excel 公式注入：以 = + - @ 开头的单元格内容前置单引号；
+  // detail 在 JSON.stringify 前先处理，保证引号包住的值本身已被中和
+  const csvSafe = (v) => {
+    const s = String(v || '')
+    return /^[=+\-@]/.test(s.trimStart()) ? `'${s}` : s
+  }
   const rows = logs.map((r) =>
-    [r.created_at, r.admin_name, r.action, r.target_type, r.target_id, JSON.stringify(r.detail || ''), r.ip]
-      .map((v) => `"${String(v || '').replace(/"/g, '""')}"`)
+    [r.created_at, r.admin_name, r.action, r.target_type, r.target_id, JSON.stringify(csvSafe(r.detail || '')), r.ip]
+      .map((v) => `"${csvSafe(v).replace(/"/g, '""')}"`)
       .join(','),
   )
   res.setHeader('Content-Type', 'text/csv; charset=utf-8')
