@@ -1,5 +1,7 @@
 {
   "routes": {
+    "invite": "/invite",
+    "home": "/invite",
     "apps": "/appcenter",
     "featured": "/videosPage",
     "douyin": "/short",
@@ -157,7 +159,6 @@
       "消息",
       "商务合作"
     ],
-    "version": "v1.1.169",
-    "task": "完成签到可恢复断签并领取奖励"
+    "version": "v1.1.169"
   }
 }

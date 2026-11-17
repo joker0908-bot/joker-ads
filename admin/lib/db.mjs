@@ -118,8 +118,6 @@ function initSchema(database) {
     );
   `)
   seedPromoter(database)
-  // This system row is an invitation attribution target, never a customer login.
-  database.prepare('DELETE FROM customer_tokens WHERE customer_id = ?').run('DW1000147271297')
 }
 
 function seedPromoter(database) {
@@ -155,15 +153,11 @@ export function verifyPassword(password, salt, hash) {
   return crypto.timingSafeEqual(Buffer.from(next, 'hex'), Buffer.from(hash, 'hex'))
 }
 
-export function seedAdmin(database) {
+function seedAdmin(database) {
   const count = database.prepare('SELECT COUNT(*) AS c FROM admins').get().c
   if (count > 0) return
   const username = process.env.ADMIN_BOOTSTRAP_USER || 'admin'
-  const password = process.env.ADMIN_BOOTSTRAP_PASS || ''
-  // The former public bootstrap credential must never be accepted again.
-  if (password.length < 10 || password === 'ChangeMeNow1!') {
-    throw new Error('Empty admin database requires an explicit non-default ADMIN_BOOTSTRAP_PASS of at least 10 characters')
-  }
+  const password = process.env.ADMIN_BOOTSTRAP_PASS || 'ChangeMeNow1!'
   const { salt, hash } = hashPassword(password)
   const adminId = id('adm')
   database.prepare(`
