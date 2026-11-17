@@ -47,10 +47,16 @@
       </button>
     </section>
 
-    <button class="recharge__submit" disabled>
-      新支付已暂停
-    </button>
-    <p class="recharge__note">新支付暂时关闭，已有订单仍可查询；查询结果不代表本地权益到账。</p>
+    <button
+      class="recharge__submit"
+      :disabled="submitting || !packages.length || !activeChannel"
+      @click="submit"
+    >{{ submitting ? '拉起支付中…' : '立即支付' }}</button>
+
+    <section v-if="orders.length" class="pay-orders">
+      <h3>到账记录</h3>
+      <p v-for="o in orders" :key="o.mch_order_no">{{ o.package_name }} · {{ orderStatus(o) }}</p>
+    </section>
 
     <div v-if="payModal" class="pay-modal" @click.self="closePayModal">
       <div class="pay-modal__box">
@@ -70,7 +76,7 @@
             该通道不支持页面内嵌，请点击下方「新窗口打开」扫码支付。
           </p>
         </div>
-        <p v-if="pollStatus === 'paid'" class="pay-modal__ok">渠道返回已支付，本地权益未入账</p>
+        <p v-if="pollStatus === 'paid'" class="pay-modal__ok">支付成功，正在返回…</p>
         <p v-else-if="pollHint" class="pay-modal__wait">{{ pollHint }}</p>
         <p v-else-if="pollStatus === 'pending'" class="pay-modal__wait">请使用手机扫码完成支付</p>
         <div class="pay-modal__actions">
@@ -85,21 +91,10 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { fetchVipPackages, fetchGoldPackages } from '../api/recharge.js'
+import { fetchPayCatalog, fetchPayOrders } from '../api/pay.js'
 import { createNajinOrder, queryNajinOrder, NAJIN_PRODUCTS } from '../api/najin.js'
+import { refreshCustomer } from '../composables/useCustomer.js'
 import { showToast } from '../composables/useToast.js'
-
-const FALLBACK_VIP = [
-  { id: 'vip-7', name: '7天VIP', price: 30, tip: '限时特惠' },
-  { id: 'vip-30', name: '30天VIP', price: 88, tip: '最受欢迎' },
-  { id: 'vip-90', name: '90天VIP', price: 198, tip: '超值' },
-]
-
-const FALLBACK_GOLD = [
-  { id: 'gold-30', name: '30钻石', price: 30, tip: '赠送3' },
-  { id: 'gold-50', name: '50钻石', price: 50, tip: '赠送5' },
-  { id: 'gold-100', name: '100钻石', price: 100, tip: '赠送15' },
-]
 
 const route = useRoute()
 const router = useRouter()
@@ -114,6 +109,8 @@ const payChannel = ref('ali')
 const loading = ref(false)
 const submitting = ref(false)
 const error = ref('')
+const catalog = ref([])
+const orders = ref([])
 const payModal = ref(null)
 const pollStatus = ref('pending')
 const pollHint = ref('')
@@ -134,24 +131,12 @@ function channelOk(channel) {
   return price >= channel.min && price <= channel.max
 }
 
-function normalizeVip(list) {
-  if (!list.length) return FALLBACK_VIP
-  return list.slice(0, 8).map((row) => ({
-    id: row.id || row.vipType,
-    name: row.name || 'VIP',
-    price: Number(row.activitySwitch ? row.activityPrice : row.price) || 0,
-    tip: row.originalPrice ? `原价¥${row.originalPrice}` : '',
-  }))
+function orderStatus(o) {
+  return o.status === 'paid' ? '已到账' : o.status === 'failed' ? '未完成' : '待支付'
 }
 
-function normalizeGold(list) {
-  if (!list.length) return FALLBACK_GOLD
-  return list.slice(0, 8).map((row) => ({
-    id: row.id,
-    name: `${row.goldAmount}钻石`,
-    price: Number(row.price) || 0,
-    tip: row.description || (row.bonusGoldAmount ? `赠${row.bonusGoldAmount}` : ''),
-  }))
+async function loadOrders() {
+  orders.value = (await fetchPayOrders()).slice(0, 6)
 }
 
 async function loadPackages() {
@@ -159,13 +144,12 @@ async function loadPackages() {
   error.value = ''
   selected.value = 0
   try {
-    if (activeTab.value === 'gold') {
-      packages.value = normalizeGold(await fetchGoldPackages())
-    } else {
-      packages.value = normalizeVip(await fetchVipPackages())
-    }
-  } catch {
-    packages.value = activeTab.value === 'gold' ? FALLBACK_GOLD : FALLBACK_VIP
+    if (!catalog.value.length) catalog.value = (await fetchPayCatalog()).packages
+    packages.value = catalog.value.filter((p) => p.kind === activeTab.value)
+    if (!packages.value.length) error.value = '暂无可售套餐'
+  } catch (e) {
+    packages.value = []
+    error.value = e?.message || '套餐加载失败'
   } finally {
     loading.value = false
     ensurePayChannel()
@@ -193,18 +177,25 @@ function closePayModal() {
   submitting.value = false
 }
 
+async function onPaid() {
+  pollStatus.value = 'paid'
+  pollHint.value = ''
+  stopPoll()
+  await refreshCustomer().catch(() => {})
+  await loadOrders().catch(() => {})
+  showToast('已记入当前身份卡')
+  setTimeout(() => {
+    closePayModal()
+    router.push('/my')
+  }, 1200)
+}
+
 async function checkPaid() {
   if (!payModal.value?.mchOrderNo) return
   try {
     const res = await queryNajinOrder(payModal.value.mchOrderNo)
     if (res.paid) {
-      pollStatus.value = 'paid'
-      pollHint.value = ''
-      stopPoll()
-      setTimeout(() => {
-        closePayModal()
-        router.push('/my')
-      }, 1200)
+      await onPaid()
     } else {
       pollStatus.value = 'pending'
       pollHint.value = '尚未检测到支付成功，请完成扫码后再试'
@@ -224,15 +215,7 @@ function startPoll(mchOrderNo) {
   pollTimer = setInterval(async () => {
     try {
       const res = await queryNajinOrder(mchOrderNo)
-      if (res.paid) {
-        pollStatus.value = 'paid'
-        pollHint.value = ''
-        stopPoll()
-        setTimeout(() => {
-          closePayModal()
-          router.push('/my')
-        }, 1200)
-      }
+      if (res.paid) await onPaid()
     } catch {
       if (!pollFailToasted) {
         pollFailToasted = true
@@ -260,12 +243,7 @@ async function submit() {
   submitting.value = true
   error.value = ''
   try {
-    const res = await createNajinOrder({
-      productId: channel.id,
-      amount: pkg.price,
-      kind: activeTab.value,
-      packageName: pkg.name,
-    })
+    const res = await createNajinOrder({ productId: channel.id, packageId: pkg.id })
     // Only https can render inside the frame; an http checkout is mixed content.
     const framable = /^https:/i.test(res.payPageUrl || '') ? res.payPageUrl : ''
     if (res.payDeeplink && /^[a-z][a-z0-9+.-]*:/i.test(res.payDeeplink) && !/^https?:/i.test(res.payDeeplink)) {
@@ -295,6 +273,7 @@ watch(activeTab, () => loadPackages())
 watch(selected, () => ensurePayChannel())
 onMounted(() => {
   loadPackages()
+  loadOrders().catch(() => {})
   if (String(route.query.paid || '') === '1') {
     showToast('正在确认支付，请稍后点「我已支付」核对')
   }
@@ -472,4 +451,7 @@ onBeforeUnmount(() => stopPoll())
   padding: 0.16rem;
 }
 .pay-modal__btn--primary { background: var(--bl-grad); box-shadow: var(--bl-glow-shadow); color: #140C26; font-weight: 700; }
+.pay-orders { margin-top: 0.28rem; }
+.pay-orders h3 { font-size: 0.28rem; margin-bottom: 0.08rem; }
+.pay-orders p { color: var(--bl-muted); font-size: 0.24rem; line-height: 1.6; }
 </style>

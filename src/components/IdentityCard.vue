@@ -26,6 +26,14 @@
             <b>{{ customer.inviteCode || '—' }}</b>
             <button type="button" @click="copy(customer.inviteCode, '邀请码')">复制</button>
           </li>
+          <li>
+            <em>会员</em>
+            <b>{{ customer.isVip ? `VIP 至 ${customer.vipUntil}` : '普通用户' }}</b>
+          </li>
+          <li>
+            <em>钻石</em>
+            <b>{{ customer.diamonds }}</b>
+          </li>
         </ul>
         <div class="card__qr">
           <img v-if="qr" :src="qr" alt="菠萝视频邀请二维码" />

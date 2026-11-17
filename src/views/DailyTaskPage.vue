@@ -2,12 +2,12 @@
   <SubPage title="每日任务">
     <section class="balance">
       <div><strong>{{ account.points }}</strong><span>积分</span></div>
-      <div><strong>{{ account.gold }}</strong><span>钻石</span></div>
+      <div><strong>{{ customer.diamonds }}</strong><span>钻石</span></div>
       <div><strong>{{ account.watchTickets }}</strong><span>观影券</span></div>
     </section>
 
-    <button class="signin" disabled>
-      本地签到奖励尚未接入
+    <button class="signin" :disabled="signing" @click="onSignin">
+      {{ signing ? '签到中…' : '每日签到' }}
     </button>
 
     <h3 class="sec-title">任务列表</h3>
@@ -15,10 +15,9 @@
       <li v-for="t in tasks" :key="t.id" class="task">
         <div class="task__info">
           <strong>{{ t.name }}</strong>
-          <p>{{ t.desc }}</p>
         </div>
         <span v-if="t.progress" class="task__progress">{{ t.progress }}</span>
-        <button class="task__go" @click="showToast('奖励尚未接入，当前不发放奖励')">查看说明</button>
+        <button class="task__go" @click="router.push(t.to)">去完成</button>
       </li>
     </ul>
   </SubPage>
@@ -31,30 +30,32 @@ import SubPage from '../components/SubPage.vue'
 import { fetchUserInfo, fetchUserSignin, fetchActionStats } from '../api/users.js'
 import { normalizeAccount } from '../api/normalize.js'
 import { showToast } from '../composables/useToast.js'
+import { customerState, refreshCustomer } from '../composables/useCustomer.js'
 
 const router = useRouter()
 const account = ref(normalizeAccount(null))
 const actions = ref({ commentCount: 0, downloadCount: 0, aiCreateCount: 0 })
 const signing = ref(false)
+const customer = customerState
 
 const tasks = computed(() => [
-  { id: 'watch', name: '观看影片', desc: '观看奖励尚未接入，当前不发放奖励', to: '/videosPage', progress: '' },
+  { id: 'watch', name: '观看影片', to: '/videosPage', progress: '' },
   {
     id: 'comment',
     name: '发表评论',
-    desc: '评论奖励尚未接入，当前不发放奖励',
+   
     to: '/videosPage',
     progress: `已评论 ${actions.value.commentCount}`,
   },
   {
     id: 'download',
     name: '下载应用',
-    desc: '下载奖励尚未接入，当前不发放奖励',
+   
     to: '/appcenter',
     progress: `已下载 ${actions.value.downloadCount}`,
   },
-  { id: 'invite', name: '邀请好友', desc: '仅记录邀请关系，当前不发放奖励', to: '/my/shareApp', progress: `已邀请 ${account.value.inviteCount}` },
-  { id: 'recharge', name: '每日充值', desc: '充值已暂停，当前不发放奖励', to: '/recharge?type=gold', progress: '' },
+  { id: 'invite', name: '邀请好友', to: '/my/shareApp', progress: `已邀请 ${account.value.inviteCount}` },
+  { id: 'recharge', name: '每日充值', to: '/recharge?type=gold', progress: '' },
 ])
 
 async function loadAccount() {
@@ -79,6 +80,7 @@ async function onSignin() {
 }
 
 onMounted(async () => {
+  refreshCustomer().catch(() => {})
   await loadAccount()
   try {
     const s = await fetchActionStats()

@@ -17,15 +17,31 @@ function bffUrl(path) {
   return `https://al-ads.com/pay-bff${p}`
 }
 
-export async function createNajinOrder({ productId, amount, kind, packageName }) {
-  throw new Error('新支付暂时关闭，已有订单仍可查询')
+export async function createNajinOrder({ productId, packageId }) {
+  let cardToken = ''
+  try {
+    cardToken = localStorage.getItem('dw_card_token') || ''
+  } catch {}
+  const res = await fetch(bffUrl('/create'), {
+    method: 'POST',
+    credentials: 'include',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ productId, packageId, cardToken }),
+  })
+  const json = await res.json().catch(() => ({}))
+  if (!res.ok || !json.ok) {
+    if (json.code === 'PAYMENT_DISABLED' || res.status === 503) throw new Error(json.message || '支付通道暂未开放，请稍后再试')
+    throw new Error(json.message || `支付下单失败 (${res.status})`)
+  }
+  return json
 }
 
 export async function queryNajinOrder(mchOrderNo) {
   const res = await fetch(`${bffUrl('/query')}?mchOrderNo=${encodeURIComponent(mchOrderNo)}`, {
+    credentials: 'include',
     headers: { Accept: 'application/json' },
   })
-  const json = await res.json()
+  const json = await res.json().catch(() => ({}))
   if (!res.ok || !json.ok) {
     throw new Error(json.message || '查询失败')
   }

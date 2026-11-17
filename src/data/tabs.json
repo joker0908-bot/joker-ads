@@ -1,6 +1,9 @@
 {
   "routes": {
+    "invite": "/invite",
+    "home": "/invite",
     "apps": "/appcenter",
+    "video": "/video",
     "featured": "/videosPage",
     "douyin": "/short",
     "mine": "/my"

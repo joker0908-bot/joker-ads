@@ -14,6 +14,10 @@ export const customerState = reactive({
   inviteCode: '',
   invitedBy: '',
   inviteCount: 0,
+  diamonds: 0,
+  vipUntil: '',
+  isVip: false,
+  vipName: '普通用户',
   isNew: false,
   error: '',
 })
@@ -103,6 +107,10 @@ export function applyCustomerResult(data) {
   customerState.inviteCode = data.inviteCode
   customerState.invitedBy = data.invitedBy || ''
   customerState.inviteCount = Number(data.inviteCount || 0)
+  customerState.diamonds = Number(data.diamonds || 0)
+  customerState.vipUntil = data.vipUntil || ''
+  customerState.isVip = !!data.isVip
+  customerState.vipName = data.vipName || (data.isVip ? 'VIP' : '普通用户')
   customerState.error = ''
   customerState.ready = true
 }

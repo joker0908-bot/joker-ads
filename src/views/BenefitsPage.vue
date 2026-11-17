@@ -3,19 +3,32 @@
     <section class="wallet">
       <div class="wallet__vip">
         <div>
-          <strong>{{ account.vipName }}</strong>
-          <p v-if="account.vipUntil">有效期至 {{ account.vipUntil }}</p>
-          <p v-else>账户权益尚未接入，充值已暂停</p>
+          <strong>{{ customer.vipName }}</strong>
+          <p v-if="customer.vipUntil">有效期至 {{ customer.vipUntil }}</p>
         </div>
         <button @click="router.push('/recharge?type=vip')">
-          {{ account.isVip ? '续费' : '开通' }}
+          {{ customer.isVip ? '续费' : '开通' }}
         </button>
       </div>
       <div class="wallet__grid">
-        <div><strong>{{ account.gold }}</strong><span>钻石</span></div>
+        <div><strong>{{ customer.diamonds }}</strong><span>钻石</span></div>
         <div><strong>{{ account.points }}</strong><span>积分</span></div>
         <div><strong>{{ account.watchTickets }}</strong><span>观影券</span></div>
         <div><strong>{{ account.downloadTickets }}</strong><span>下载券</span></div>
+      </div>
+    </section>
+
+    <section class="redeem">
+      <h3>钻石兑换会员</h3>
+      <p>{{ diamondsPerDay }} 钻 = 1 天</p>
+      <div class="redeem__row">
+        <label>
+          天数
+          <input v-model.number="days" type="number" min="1" :max="maxDays" />
+        </label>
+        <button :disabled="redeeming" @click="redeem">
+          {{ redeeming ? '兑换中…' : `用 ${cost} 钻兑换` }}
+        </button>
       </div>
     </section>
 
@@ -32,7 +45,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import SubPage from '../components/SubPage.vue'
 import CebImg from '../components/CebImg.vue'
@@ -40,11 +53,46 @@ import { fetchUserInfo } from '../api/users.js'
 import { fetchWelfareConfig } from '../api/activity.js'
 import { normalizeAccount } from '../api/normalize.js'
 import { showToast } from '../composables/useToast.js'
+import { fetchPayCatalog, redeemVip } from '../api/pay.js'
+import { customerState, refreshCustomer } from '../composables/useCustomer.js'
 
 const router = useRouter()
 const account = ref(normalizeAccount(null))
 const welfare = ref([])
 const loading = ref(true)
+const customer = customerState
+const days = ref(1)
+const maxDays = ref(30)
+const diamondsPerDay = ref(10)
+const redeeming = ref(false)
+let redeemRequestId = ''
+
+const clampDays = () => Math.min(maxDays.value, Math.max(1, Number(days.value) || 1))
+const cost = computed(() => clampDays() * diamondsPerDay.value)
+
+function newRequestId() {
+  const raw = (typeof crypto !== 'undefined' && crypto.randomUUID?.()) || `${Date.now()}${Math.random().toString(16).slice(2)}`
+  return `rdm_${raw.replace(/-/g, '')}`.slice(0, 64)
+}
+
+async function redeem() {
+  if (redeeming.value) return
+  const n = clampDays()
+  days.value = n
+  // Reuse the id until the server answers so a retried tap cannot double-spend.
+  if (!redeemRequestId) redeemRequestId = newRequestId()
+  redeeming.value = true
+  try {
+    const res = await redeemVip({ days: n, requestId: redeemRequestId })
+    redeemRequestId = ''
+    await refreshCustomer()
+    showToast(res.already ? '这笔兑换已经入账' : `已兑换 ${n} 天会员`)
+  } catch (e) {
+    showToast(e?.message || '兑换失败')
+  } finally {
+    redeeming.value = false
+  }
+}
 
 function openWelfare(w) {
   const url = w?.url || ''
@@ -60,6 +108,12 @@ function openWelfare(w) {
 }
 
 onMounted(async () => {
+  refreshCustomer().catch(() => {})
+  try {
+    const { redeem: rule } = await fetchPayCatalog()
+    if (rule?.diamondsPerDay) diamondsPerDay.value = Number(rule.diamondsPerDay)
+    if (rule?.maxDays) maxDays.value = Number(rule.maxDays)
+  } catch {}
   try {
     const info = await fetchUserInfo()
     account.value = normalizeAccount(info.data ?? info)
@@ -155,4 +209,12 @@ onMounted(async () => {
   font-size: 0.28rem;
   padding: 0.16rem;
 }
+.redeem { background: var(--bl-surface); border: 1px solid var(--bl-hair); border-radius: 0.16rem; margin-bottom: 0.32rem; padding: 0.28rem; }
+.redeem h3 { font-size: 0.32rem; margin-bottom: 0.08rem; }
+.redeem p { color: var(--bl-muted); font-size: 0.24rem; line-height: 1.5; }
+.redeem__row { align-items: center; display: flex; gap: 0.16rem; margin-top: 0.2rem; }
+.redeem label { color: var(--bl-muted); font-size: 0.26rem; }
+.redeem input { background: var(--bl-surface-2); border: 1px solid var(--bl-line); border-radius: 0.08rem; color: var(--bl-text); font-size: 0.28rem; margin-left: 0.08rem; padding: 0.08rem 0.12rem; width: 1.2rem; }
+.redeem button { background: var(--bl-grad); box-shadow: var(--bl-glow-shadow); border: none; border-radius: 0.8rem; color: var(--bl-on-accent); font-size: 0.26rem; font-weight: 700; padding: 0.12rem 0.28rem; }
+.redeem button:disabled { opacity: 0.5; }
 </style>
