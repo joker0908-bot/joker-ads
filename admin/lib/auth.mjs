@@ -4,6 +4,9 @@ import { verifyTotp } from './totp.mjs'
 
 const SESSION_DAYS = 7
 const MIN_PASSWORD_LENGTH = 10
+// 登录失败限流：15 分钟窗口内最多 8 次；Map 设上限防恶意用户名/IP 把内存打爆
+const LOGIN_FAILURE_WINDOW_MS = 15 * 60 * 1000
+const LOGIN_FAILURE_MAX_KEYS = 5_000
 const loginFailures = new Map()
 
 export const READ_SCOPES = {
@@ -60,6 +63,18 @@ function recordLoginFailure(req, username) {
   row.count += 1
   row.at = Date.now()
   loginFailures.set(key, row)
+  // 超上限先清已过期项，仍超限则淘汰最老条目（Map 按插入序遍历），防无界增长
+  if (loginFailures.size > LOGIN_FAILURE_MAX_KEYS) {
+    const now = Date.now()
+    for (const [k, v] of loginFailures) {
+      if (now - v.at > LOGIN_FAILURE_WINDOW_MS) loginFailures.delete(k)
+    }
+    while (loginFailures.size > LOGIN_FAILURE_MAX_KEYS) {
+      const oldest = loginFailures.keys().next().value
+      if (oldest === undefined) break
+      loginFailures.delete(oldest)
+    }
+  }
 }
 
 function clearLoginFailure(req, username) {
@@ -69,7 +84,7 @@ function clearLoginFailure(req, username) {
 function loginLimited(req, username) {
   const row = loginFailures.get(loginKey(req, username))
   if (!row) return false
-  if (Date.now() - row.at > 15 * 60 * 1000) {
+  if (Date.now() - row.at > LOGIN_FAILURE_WINDOW_MS) {
     loginFailures.delete(loginKey(req, username))
     return false
   }
@@ -152,6 +167,8 @@ export function handleLogin(req, res) {
   const token = crypto.randomBytes(32).toString('hex')
   const expires = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000).toISOString()
   db.prepare('INSERT INTO sessions (token, admin_id, expires_at, created_at) VALUES (?, ?, ?, ?)').run(token, row.id, expires, now())
+  // 顺手清过期会话：无后台任务，借登录写入做惰性清理（正式清理归 db.mjs 负责）
+  db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(now())
   writeLog({ admin: row, action: '管理员登录', targetType: 'auth', ip: clientIp(req) })
   res.setHeader('Set-Cookie', sessionCookie(token, req, SESSION_DAYS * 24 * 60 * 60))
   res.json({ user: adminSafe(row) })

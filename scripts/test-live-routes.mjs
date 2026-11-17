@@ -76,13 +76,17 @@ try {
   const claim = await call('/api/public/customers/claim', { method: 'POST', body: { deviceFp: 'fp-live-routes-fixture' } })
   assert.equal(claim.status, 200)
   const cardToken = claim.json.token
-  const me = await call('/api/public/customers/me?token=' + encodeURIComponent(cardToken))
+  // claim 响应已种 dw_card HttpOnly cookie；GET 端点改认 X-Card-Token 头或该 cookie，?token= 一律忽略
+  const cardCookieHeader = claim.headers.get('set-cookie').split(';')[0]
+  assert.ok(cardCookieHeader.startsWith('dw_card='), 'claim issues the dw_card cookie')
+  const me = await call('/api/public/customers/me', { headers: { 'X-Card-Token': cardToken } })
   assert.equal(me.status, 200)
   assert.equal(me.json.diamonds, 0, 'wallet fields are part of the customer card')
   assert.equal(me.json.isVip, false)
+  assert.equal((await call('/api/public/customers/me?token=' + encodeURIComponent(cardToken))).status, 404, 'query token is not honored')
   const redeem = await call('/api/public/pay/redeem', { method: 'POST', body: { cardToken, days: 1, requestId: 'r1' } })
   assert.ok(redeem.status === 400 && redeem.json.ok === false, 'redeem without diamonds is refused cleanly')
-  const orders = await call('/api/public/pay/orders?token=' + encodeURIComponent(cardToken))
+  const orders = await call('/api/public/pay/orders', { headers: { Cookie: cardCookieHeader } })
   assert.equal(orders.status, 200); assert.deepEqual(orders.json.orders, [])
   console.log('PASS pay catalog, wallet card fields, redeem/orders auth and refusal')
 
@@ -140,6 +144,11 @@ try {
   assert.notEqual(keyed.status, 401); assert.notEqual(keyed.status, 429)
   assert.ok(keyed.json && 'code' in keyed.json, 'boluo-api answers JSON')
   assert.equal((await call('/boluo-api/api/videos', { headers: { Authorization: 'Bearer ' + key.secret } })).status, keyed.status)
+  // ?key= 在 /boluo-api 直连下一律不认；只对经 /dewu-api 前缀到达（nginx 重写后经
+  // X-Original-URI 透传原前缀）的遗留请求放行，模拟生产转发链验证该放行口
+  assert.equal((await call('/boluo-api/api/videos?key=' + encodeURIComponent(key.secret))).status, 401, 'query key refused on boluo-api')
+  const legacyQuery = await call('/boluo-api/api/videos?key=' + encodeURIComponent(key.secret), { headers: { 'X-Original-URI': '/dewu-api/api/videos' } })
+  assert.notEqual(legacyQuery.status, 401, 'dewu-api legacy prefix still accepts query key')
   assert.equal((await call('/api/admin/drama-api-keys/' + key.id, { method: 'POST', body: { paused: true } })).status, 200)
   assert.equal((await call('/boluo-api/api/videos', { headers: { 'X-Api-Key': key.secret } })).status, 401, 'paused key refused')
   assert.equal((await call('/api/admin/drama-api-keys/' + key.id, { method: 'DELETE' })).status, 200)

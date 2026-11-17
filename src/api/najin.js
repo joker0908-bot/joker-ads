@@ -18,6 +18,7 @@ function bffUrl(path) {
 }
 
 export async function createNajinOrder({ productId, packageId }) {
+  // 客户凭据首选 HttpOnly cookie dw_card；这里仅取 localStorage 值作 POST body 的 cardToken 载荷
   let cardToken = ''
   try {
     cardToken = localStorage.getItem('dw_card_token') || ''

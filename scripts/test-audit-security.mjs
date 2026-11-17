@@ -42,6 +42,8 @@ const port = await new Promise(resolve => { const s = net.createServer().listen(
 const child = spawn(process.execPath, ['server.mjs'], { cwd: dir, stdio: ['ignore', 'pipe', 'pipe'], env: {
   ...process.env, ADMIN_PORT: String(port), ADMIN_HOST: '127.0.0.1', ADMIN_DB_PATH: dbPath,
   SITE_DATA_DIR: dataDir, UPLOAD_DIR: path.join(tmp, 'uploads'), ADMIN_BOOTSTRAP_USER: 'fixture', ADMIN_BOOTSTRAP_PASS: password,
+  // 生产必备签名密钥：缺失时签名/验签 fail closed，测试环境注入固定值（不走 ALLOW_DEV_UNSIGNED 兜底）
+  VIDEO_URL_SECRET: 'test-secret',
 } })
 let logs = '', cookie = '', db
 child.stdout.on('data', b => { logs += b })
@@ -98,13 +100,19 @@ try {
   console.log('PASS limiter key uses framework IP; repeated trusted-proxy IP is limited')
   assert.equal((await req('/data/config.json.bak')).status, 404)
   assert.equal((await req('/data/config.json')).status, 200)
-  console.log('PASS exact public data allowlist blocks backups')
+  // P0：api-session.json 含上游 API token，公开 /data/ 白名单已将其移除
+  assert.equal((await req('/data/api-session.json')).status, 404)
+  console.log('PASS exact public data allowlist blocks backups and api-session')
   const ordinary = await req('/api/public/customers/claim', 'POST', { deviceFp: 'fp-fixture-ordinary' }, '')
   assert.equal(ordinary.status, 200)
   assert.equal((await req('/api/public/customers/claim', 'POST', { deviceFp: 'seed:1000147271297' }, '')).status, 403)
   const fixtureToken = crypto.randomBytes(32).toString('hex')
   db.prepare('INSERT INTO customer_tokens VALUES (?,?,?)').run(fixtureToken, 'DW1000147271297', new Date().toISOString())
-  assert.equal((await req('/api/public/customers/me?token=' + fixtureToken)).status, 404)
+  // GET 端点只认 X-Card-Token / Authorization 头或 dw_card cookie，?token= 一律忽略
+  assert.equal((await req('/api/public/customers/me', 'GET', undefined, '', { 'X-Card-Token': fixtureToken })).status, 404)
+  assert.equal((await req('/api/public/customers/me?token=' + fixtureToken)).status, 404, 'query token ignored even when syntactically present')
+  assert.equal((await req('/api/public/customers/me?token=' + ordinary.data.token)).status, 404, 'valid query token is not honored')
+  assert.equal((await req('/api/public/customers/me', 'GET', undefined, '', { 'X-Card-Token': ordinary.data.token })).status, 200, 'header token is honored')
   assert.equal((await req('/api/public/customers/claim', 'POST', { deviceFp: 'fp-other-fixture', cardToken: fixtureToken }, '')).status, 403)
   const again = await req('/api/public/customers/claim', 'POST', { deviceFp: 'fp-fixture-ordinary', cardToken: ordinary.data.token }, '')
   assert.equal(again.data.customerId, ordinary.data.customerId)

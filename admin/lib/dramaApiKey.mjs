@@ -1,4 +1,3 @@
-import { spawnSync } from 'node:child_process'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -175,7 +174,8 @@ export function createDramaApiKey({ remark, scopes }) {
   const data = loadRegistry()
   const row = {
     id: `key_${crypto.randomBytes(6).toString('hex')}`,
-    secret: `dw_${crypto.randomBytes(24).toString('hex')}`,
+    // 新密钥改用 bl_ 前缀（boluo）；存量 dw_ 密钥字符串不变、照常有效
+    secret: `bl_${crypto.randomBytes(24).toString('hex')}`,
     remark: name,
     scopes: picked,
     paused: false,

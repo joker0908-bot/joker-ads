@@ -204,17 +204,30 @@ export function safeMediaPath(rel) {
     }
   }
   if (!pathName.startsWith('/huangguo/download/')) return null
-  if (pathName.includes('..') || pathName.includes('\\') || pathName.includes('\0')) return null
+  // 解码后再判一次，拦截 %2e%2e 等编码形式的目录穿越
+  let decoded
+  try { decoded = decodeURIComponent(pathName) } catch { return null }
+  if (decoded.includes('..') || decoded.includes('\\') || decoded.includes('\0')) return null
   return pathName
 }
 
 export function rewritePlaylist(text, videoId, exp, sig) {
+  const segProxy = (raw) => {
+    const safe = safeMediaPath(raw)
+    if (!safe) return null
+    return `/api/public/videos/${encodeURIComponent(videoId)}/seg?p=${encodeURIComponent(safe)}&exp=${exp}&sig=${sig}`
+  }
   return String(text || '').split(/\r?\n/).map((line) => {
     const trimmed = line.trim()
-    if (!trimmed || trimmed.startsWith('#')) return line
-    const safe = safeMediaPath(trimmed)
-    if (!safe) return line
-    return `/api/public/videos/${encodeURIComponent(videoId)}/seg?p=${encodeURIComponent(safe)}&exp=${exp}&sig=${sig}`
+    if (!trimmed) return line
+    if (trimmed.startsWith('#')) {
+      // 注释行里的 URI="..."（密钥/MAP/多音轨）同样要走本地代理
+      return line.replace(/URI="([^"]+)"/g, (m, uri) => {
+        const proxy = segProxy(uri)
+        return proxy ? `URI="${proxy}"` : m
+      })
+    }
+    return segProxy(trimmed) || line
   }).join('\n')
 }
 
@@ -223,7 +236,11 @@ export async function fetchCover(show) {
   const pathName = safeMediaPath(show?.cover)
   if (!origin || !pathName) return null
   const upstream = await fetchBin(`${origin}${pathName}`)
-  if (!upstream.ok) return null
+  if (!upstream.ok) {
+    // 非 2xx 的 body 不消费会占住连接，主动丢弃
+    upstream.body?.cancel().catch(() => {})
+    return null
+  }
   return upstream
 }
 
@@ -244,8 +261,14 @@ export async function fetchSegment(rel) {
   const pathName = safeMediaPath(rel)
   if (!origin || !pathName) throw httpError(404, 'not_found', '该视频暂不可用')
   const upstream = await fetchBin(`${origin}${pathName}`)
-  if (upstream.status === 404) throw httpError(404, 'not_found', '该视频暂不可用')
-  if (!upstream.ok) throw httpError(502, 'upstream', '加载失败，请检查网络后重试')
+  if (upstream.status === 404) {
+    upstream.body?.cancel().catch(() => {})
+    throw httpError(404, 'not_found', '该视频暂不可用')
+  }
+  if (!upstream.ok) {
+    upstream.body?.cancel().catch(() => {})
+    throw httpError(502, 'upstream', '加载失败，请检查网络后重试')
+  }
   return upstream
 }
 

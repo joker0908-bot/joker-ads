@@ -46,14 +46,19 @@ function load() {
     state.complete = Boolean(raw.complete)
     state.skitsUpdatedAt = Number(raw.skitsUpdatedAt) || 0
     state.skitsComplete = Boolean(raw.skitsComplete)
-  } catch {}
-  state.loaded = true
+  } catch {
+    // JSON 损坏等异常：回退为空目录，ensureCatalog 会因 rows 为空触发冷启动重建
+  } finally {
+    // 文件不存在时提前 return 也不能漏掉本标记，否则每次调用都会重复尝试读盘
+    state.loaded = true
+  }
 }
 
+// 原子写：先写临时文件并 fsync，再 rename 覆盖，崩溃也不会留下半个 JSON（参照 jsonStore.writeJsonAtomic，此处自实现避免循环依赖）
 function persist() {
+  const tmp = `${CATALOG_PATH}.${process.pid}.${Date.now()}.tmp`
   try {
-    fs.mkdirSync(path.dirname(CATALOG_PATH), { recursive: true })
-    const tmp = `${CATALOG_PATH}.${process.pid}.tmp`
+    fs.mkdirSync(path.dirname(CATALOG_PATH), { recursive: true, mode: 0o755 })
     const payload = {
       updatedAt: state.updatedAt,
       complete: state.complete,
@@ -63,9 +68,17 @@ function persist() {
       skitsComplete: state.skitsComplete,
       skits: [...state.skits.values()],
     }
-    fs.writeFileSync(tmp, JSON.stringify(payload))
+    const fd = fs.openSync(tmp, 'w', 0o600)
+    try {
+      fs.writeFileSync(fd, JSON.stringify(payload))
+      fs.fsyncSync(fd)
+    } finally {
+      fs.closeSync(fd)
+    }
     fs.renameSync(tmp, CATALOG_PATH)
-  } catch {}
+  } catch {
+    try { fs.rmSync(tmp, { force: true }) } catch {}
+  }
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))

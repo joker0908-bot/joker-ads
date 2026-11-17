@@ -86,8 +86,11 @@ function issueToken(db, customerId) {
   return token
 }
 
+// last_seen_at 写入节流：距上次记录不足 60 秒则跳过本次 UPDATE，降低读客户热路径的写放大
+const TOUCH_THROTTLE_MS = 60_000
 function touch(db, customerId) {
-  db.prepare('UPDATE customers SET last_seen_at = ? WHERE id = ?').run(now(), customerId)
+  const cutoff = new Date(Date.now() - TOUCH_THROTTLE_MS).toISOString()
+  db.prepare('UPDATE customers SET last_seen_at = ? WHERE id = ? AND last_seen_at < ?').run(now(), customerId, cutoff)
 }
 
 export function findInviterId(db, inviteCode) {

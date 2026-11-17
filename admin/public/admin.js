@@ -74,6 +74,24 @@ function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 }
 
+// 链接协议白名单：仅放行 http(s) 与站内相对路径，拒绝 javascript: 等危险协议。
+// 确需放行的其他协议（如 otpauth:）通过 extraProtocols 显式传入。
+function safeUrl(raw, extraProtocols = []) {
+  const s = String(raw || '').trim()
+  if (!s) return ''
+  try {
+    const p = new URL(s, location.origin).protocol.toLowerCase()
+    if (p === 'http:' || p === 'https:' || extraProtocols.includes(p)) return s
+  } catch {}
+  return ''
+}
+
+// 图片地址白名单：在 safeUrl 基础上额外放行 data:image/ 内联图。
+function safeImg(raw) {
+  const s = String(raw || '').trim()
+  return /^data:image\//i.test(s) ? s : safeUrl(s)
+}
+
 function canWrite(scope) {
   if (!user) return false
   if (user.role === 'readonly') return false
@@ -288,7 +306,7 @@ function textField(id, label, value) {
 function imageField(id, label, value) {
   const src = String(value || '').trim()
   return `<div class="form-group"><label class="form-label">${esc(label)}</label>
-    <img class="shot" id="${id}-shot" src="${esc(src)}" alt="" ${src ? '' : 'hidden'} />
+    <img class="shot" id="${id}-shot" src="${esc(safeImg(src))}" alt="" ${src ? '' : 'hidden'} />
     <input type="file" id="${id}-file" accept="image/*" />
     <input type="hidden" id="${id}" value="${esc(src)}" /></div>`
 }
@@ -317,8 +335,10 @@ function bindImageInput(id, kind) {
       const url = await uploadImage(picked, kind)
       $(`#${id}`).value = url
       const shot = $(`#${id}-shot`)
-      shot.hidden = false
-      shot.src = url
+      // 上传返回的地址同样过白名单，避免异常值写进 img.src
+      const safe = safeImg(url)
+      shot.hidden = !safe
+      shot.src = safe
     } catch (error) {
       toast(error.message || '上传失败')
     }
@@ -396,7 +416,7 @@ async function saveSlot(slotKey, items) {
 async function renderApps(main) {
   const data = await api(`/api/admin/apps?page=${appsPage}&q=${encodeURIComponent(appsQuery)}`)
   main.innerHTML = `
-    <div class="page-header"><span class="page-title">应用列表 (${data.total})</span>
+    <div class="page-header"><span class="page-title">应用列表 (${esc(data.total)})</span>
       ${canWrite('apps') ? '<button class="btn btn-primary" id="add-app">新增应用</button>' : ''}</div>
     <div class="page-actions" style="margin-bottom:14px;">
       <input id="apps-q" placeholder="搜索名称/链接" value="${esc(appsQuery)}" style="max-width:280px" />
@@ -405,13 +425,13 @@ async function renderApps(main) {
     <div class="card" style="padding:0;overflow:auto;"><table>
       <thead><tr><th>图标</th><th>名称</th><th>链接</th><th>操作</th></tr></thead>
       <tbody>${data.apps.map((a) => `<tr>
-        <td>${a.icon ? `<img class="img-thumb" src="${esc(a.icon)}" />` : '-'}</td>
-        <td>${esc(a.name)}${a.duplicateCount > 1 ? ` <small>同名 ${a.duplicateCount} 条</small>` : ''}</td><td class="link-cell">${esc(a.url)}</td>
+        <td>${a.icon ? `<img class="img-thumb" src="${esc(safeImg(a.icon))}" />` : '-'}</td>
+        <td>${esc(a.name)}${a.duplicateCount > 1 ? ` <small>同名 ${esc(a.duplicateCount)} 条</small>` : ''}</td><td class="link-cell">${esc(a.url)}</td>
         <td class="action-btns">${canWrite('apps') ? `<button class="btn btn-blue btn-sm" data-edit="${esc(a.name)}">编辑</button><button class="btn btn-danger btn-sm" data-del="${esc(a.name)}">删</button>` : ''}</td>
       </tr>`).join('')}</tbody></table></div>
     <div class="page-actions" style="margin-top:12px;">
       <button class="btn btn-gray btn-sm" id="apps-prev" ${appsPage <= 1 ? 'disabled' : ''}>上一页</button>
-      <span style="color:#777;font-size:13px;">第 ${data.page} 页</span>
+      <span style="color:#777;font-size:13px;">第 ${esc(data.page)} 页</span>
       <button class="btn btn-gray btn-sm" id="apps-next" ${appsPage * data.pageSize >= data.total ? 'disabled' : ''}>下一页</button>
     </div>`
   $('#apps-search').onclick = () => { appsQuery = $('#apps-q').value.trim(); appsPage = 1; void renderApps(main).catch(reportActionError) }
@@ -590,10 +610,10 @@ async function renderStats(main) {
       <a class="btn btn-gray btn-sm" href="/api/admin/logs/export">导出操作日志</a></div>
     <div class="source-grid">
       <div class="card"><div style="font-weight:700;margin-bottom:12px;">按广告位</div>
-        ${(data.bySlot || []).map((r) => `<div class="source-item"><span>${esc(r.slot || '(未标记)')}</span><strong>${r.clicks}</strong></div>`).join('') || '<div class="empty-row">暂无数据</div>'}
+        ${(data.bySlot || []).map((r) => `<div class="source-item"><span>${esc(r.slot || '(未标记)')}</span><strong>${esc(r.clicks)}</strong></div>`).join('') || '<div class="empty-row">暂无数据</div>'}
       </div>
       <div class="card"><div style="font-weight:700;margin-bottom:12px;">近 14 日</div>
-        ${(data.daily || []).map((r) => `<div class="source-item"><span>${esc(r.day)}</span><strong>${r.clicks}</strong></div>`).join('') || '<div class="empty-row">暂无数据</div>'}
+        ${(data.daily || []).map((r) => `<div class="source-item"><span>${esc(r.day)}</span><strong>${esc(r.clicks)}</strong></div>`).join('') || '<div class="empty-row">暂无数据</div>'}
       </div>
     </div>`
 }
@@ -614,7 +634,7 @@ async function renderLogs(main) {
 async function renderCustomers(main) {
   const data = await api('/api/admin/customers?limit=100')
   main.innerHTML = `
-    <div class="page-header"><span class="page-title">客户身份卡（${data.total}）</span></div>
+    <div class="page-header"><span class="page-title">客户身份卡（${esc(data.total)}）</span></div>
     <div class="card" style="padding:0;overflow:auto;"><table>
       <thead><tr><th>客户ID</th><th>身份卡号</th><th>邀请码</th><th>钻石</th><th>会员至</th><th>邀请人</th><th>签发</th></tr></thead>
       <tbody>${(data.customers || []).map((c) => `<tr>
@@ -636,7 +656,7 @@ async function renderApiSession(main) {
     <div class="page-header"><span class="page-title">原站 Token</span></div>
     <div class="card" style="max-width:640px;">
       <p class="form-help">线上 uid：<code>${esc(live.uid || '—')}</code></p>
-      <p class="form-help">摘要：<code>${esc(live.tokenPreview || '未配置')}</code> · ${live.tokenLen || 0} 位</p>
+      <p class="form-help">摘要：<code>${esc(live.tokenPreview || '未配置')}</code> · ${esc(live.tokenLen || 0)} 位</p>
       <p class="form-help">更新时间：${esc(live.at || '—')}</p>
       <p class="form-help">资源域名：<code>${esc(live.resBase || '—')}</code></p>
       <div class="form-group"><label class="form-label">新 JWT</label>
@@ -848,7 +868,7 @@ function renderSecurity(main) {
     const data = await api('/api/admin/totp/setup', { method: 'POST', body: '{}' })
     $('#totp-area').innerHTML = `
       <p class="form-help">密钥：<code>${esc(data.secret)}</code></p>
-      <p class="form-help">otpauth：<a href="${esc(data.otpauth)}" target="_blank">${esc(data.otpauth)}</a></p>
+      <p class="form-help">otpauth：<a href="${esc(safeUrl(data.otpauth, ['otpauth:']))}" target="_blank" rel="noopener">${esc(data.otpauth)}</a></p>
       <div class="form-group"><input id="totp-code" placeholder="输入 6 位验证码启用" /></div>
       <button class="btn btn-primary" id="totp-enable">启用 2FA</button>`
     $('#totp-enable').onclick = async () => {

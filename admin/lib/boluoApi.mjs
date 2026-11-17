@@ -46,12 +46,22 @@ export async function getShow(id) {
 }
 
 export function rewritePlaylist(text, videoId, exp, sig) {
+  const segProxy = (raw) => {
+    const safe = huangguo.safeMediaPath(raw)
+    if (!safe) return null
+    return `/boluo-api/api/seg?id=${encodeURIComponent(videoId)}&p=${encodeURIComponent(safe)}&exp=${exp}&sig=${sig}`
+  }
   return String(text || '').split(/\r?\n/).map((line) => {
     const trimmed = line.trim()
-    if (!trimmed || trimmed.startsWith('#')) return line
-    const safe = huangguo.safeMediaPath(trimmed)
-    if (!safe) return line
-    return `/boluo-api/api/seg?id=${encodeURIComponent(videoId)}&p=${encodeURIComponent(safe)}&exp=${exp}&sig=${sig}`
+    if (!trimmed) return line
+    if (trimmed.startsWith('#')) {
+      // 注释行里的 URI="..."（密钥/MAP/多音轨）同样要走本地代理
+      return line.replace(/URI="([^"]+)"/g, (m, uri) => {
+        const proxy = segProxy(uri)
+        return proxy ? `URI="${proxy}"` : m
+      })
+    }
+    return segProxy(trimmed) || line
   }).join('\n')
 }
 

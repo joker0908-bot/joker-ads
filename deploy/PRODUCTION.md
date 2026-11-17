@@ -1,5 +1,11 @@
 # 唯一生产环境与发布记录
 
+## 2026-11-17 审计修复与 CI 强制命令入库
+
+- **P0**：公共 `/data/` 不再放行 `api-session.json`（上游 API token 曾可被任何人直接下载）。`b12sl5x.cn.conf` 的 allowlist 正则已删 `api-session`；`deploy-audit-release.mjs` 的 `patchIngress` 会就地剥除线上 conf 中残留的 `api-session`（含 admin 子域注入块），部署后断言两站 `/data/api-session.json` 返回 404。**注意**：`/data/site-bundle.json` 中的 `apiSession`（含 token/uid）**刻意保留**——它是前端 `apiFetch` 直连上游 `/api/v1` 的运行时轮换通道，token 同样 baked 进 JS bundle 与 APK，属架构性客户端凭据而非秘钥；剥掉会导致管理员轮换 token 后浏览器拿不到新值。彻底改为服务端注入（`/api-proxy/` 注入 token、前端零凭据）属架构改造，另起 PR。
+- **P1**：`/pay-bff/notify` 从「只记日志」改为真实入账：按 najin 签名方案验签（不匹配回 400 且记 `verified:false`），验签通过且 `status>=2` 时以 `x-pay-internal` 头调用 `ADMIN_INTERNAL_ORIGIN/api/internal/pay/credit`（默认 `http://127.0.0.1:8790`，超时 8 秒），失败回非 200 让上游重试，成功回 `success` 纯文本。`CREATE_ENABLED=false` 不变；`NAJIN_ALLOW_ORIGIN` 缺省收紧为 `https://b12sl5x.cn`；`NAJIN_CREATE_URL`/`NAJIN_QUERY_URL` 非 https 时启动告警（端点为对方所有，无法强制）。
+- **CI 强制命令仓库副本**：`deploy/joker-ads-ci-deploy.sh` 是服务器 `/usr/local/sbin/joker-ads-ci-deploy` 的逐字节镜像（2026-11-17 经 `ssh -o BatchMode=yes allenwebads 'cat /usr/local/sbin/joker-ads-ci-deploy'` 拉取，1809 字节）。部署私钥在服务器侧只被允许执行这一条命令，该脚本此前只存在于服务器。**改动必须两侧同步**：先更新服务器版本并验证，再把同一版本回写仓库副本；推送仓库不会自动替换服务器已安装的副本。核对方法见文件头注释。`deploy/ci-deploy-command.sh` 是更早入库的历史蓝本，与线上已分叉，以 `joker-ads-ci-deploy.sh` 为准。
+
 ## 2026-10-07 后台保存即上线、前台自动同步
 
 - 后台应用新增/编辑/删除、分类映射、弹窗、促销、悬浮条、精选广告和我的页快捷入口，保存成功即原子更新 `published.json` 并递增版本；不再要求另外发布。前后台都以已发布快照为准，修改只覆盖请求对应模块，不把其他旧草稿夹带上线。
@@ -135,3 +141,24 @@ python3 migrate-production-entry.py rollback \
 | 域名解析 | `b12sl5x.cn` 的权威 NS 为 `ns1.julydns.com` / `ns2.julydns.com`；主域指向服务器，`app` 子域 CNAME 指向旧 Pages | 需要实际域名后台将 `app` 切到服务器，再移除旧 Pages 域名绑定/项目 |
 
 停用前须让服务器接管对应入口和下载资源，保留已有链接的访问能力。Cloudflare 目标项目及其域名管理权限尚未取得时，如实保留此项未完成状态。
+
+## 2026-11 安全审计修复摘要
+
+本轮审计按 P0→P3 逐条处置如下（实现细节以上方 2026-11-17 一节及代码为准）：
+
+- **P0｜上游会话凭证公网可读**：`/data/api-session.json` 原在公共白名单内，任何人可直接下载上游 API token。处置：Express 与 nginx 两侧白名单同时移除该文件，一律 404。
+- **P0→重定性｜公开快照夹带 token/uid**：`/data/site-bundle.json` 直出完整 `apiSession` 系**设计使然**而非疏漏——上游 API token 在本架构中是客户端凭据（baked 进 JS bundle 与 APK，经 site-bundle 运行时轮换），审计按此重定性为架构风险项：**保留现状以维持轮换能力，后续以 `/api-proxy/` 服务端注入 token 的改造将其移出客户端**。短期缓解：已关闭冗余的 `api-session.json` 独立路由。
+- **P1｜URL 明文凭据**：`/api/public/` GET 端点不再接受 `?token=`，身份卡凭据只走 `X-Card-Token`/`Authorization: Bearer` 头或 `dw_card` HttpOnly cookie，POST body 的 `cardToken` 保留；`/boluo-api/` 不再接受 `?key=`，改走 `x-api-key`/`Authorization` 头，`/dewu-api/` 遗留前缀仍放行 query key。新建短剧密钥前缀改为 `bl_`，存量 `dw_` 密钥继续有效。
+- **P1｜支付回调不验签不入账**：`/pay-bff/notify` 现按 najin 签名方案验签（不符回 400），验签通过且已支付时以 `x-pay-internal` 头转发 `ADMIN_INTERNAL_ORIGIN/api/internal/pay/credit` 完成入账；`NAJIN_ALLOW_ORIGIN` 缺省收紧为主域。
+- **P1｜签名密钥缺失可伪造**：`VIDEO_URL_SECRET` 未配置时播放地址签名/验签 fail closed（签名 503、验签 410），仅 `ALLOW_DEV_UNSIGNED=1` 的本地/测试环境退回 dev 密钥，生产严禁开启。
+- **P2｜公开端点无限流**：`/api/public/ad-click`（60 次/分/IP）与 `/api/internal/pay/reserve`（20 次/分/IP）加进程内固定窗口限流，超限 429。
+- **P2｜上传与响应面**：上传文件按 magic bytes 复核真实图片类型，不合格即删并 400；`/uploads` 一律 `nosniff`；后台管理页内联事件与图片/链接地址 XSS 加固；操作日志 CSV 导出做公式注入中和。
+- **P3｜资源卫生与稳定性**：过期会话与孤儿 `customer_tokens` 启动时加每小时惰性清扫；boluo 目录落盘改为临时文件 + fsync + rename 原子写；上游非流式响应体设 64MB（媒体 256MB）上限；进程内缓存与限流 Map 设上界并淘汰最老条目；上游握手改单飞（single-flight）防并发互踩；`last_seen_at` 60 秒写节流。
+
+### 遗留项（本轮不改，如实记录）
+
+1. iOS `app.mobileconfig` 的 CMS 签名数据内仍残留「得污」字样：改动会破坏既有签名，且手头没有原签名材料，保持原样。
+2. `/dewu-api/` 转发保留给 juhe 聚合后端：nginx 将其 rewrite 到 `/boluo-api/` 转发，`?key=` 仅对经 `/dewu-api` 前缀到达的请求放行；`/boluo-api/` 直连只认请求头。
+3. `dw_admin`/`dw_card` cookie 名、`dw_card_token` localStorage 键与 `DW` 客户 ID 前缀因存量设备和邀请码兼容锁定保留；`dw_` 前缀存量密钥同样继续有效。
+4. `deploy/joker-ads-ci-deploy.sh` 是服务器 `/usr/local/sbin/joker-ads-ci-deploy` 的仓库镜像，改动必须先更新服务器并验证、再把同一版本回写仓库，两侧不得分叉（核对方法见文件头注释）。
+5. **上线后必须用 `/api/admin/api-session` 轮换上游 token**：曾随公开 JSON 可下载的凭证按已泄漏作废处理，轮换完成前本项不算收口。

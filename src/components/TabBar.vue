@@ -7,7 +7,7 @@
       :class="{ 'is-active': active === item.id }"
       @click="$emit('change', item.id)"
     >
-      <span class="tabbar-item__icon" v-html="icons[item.icon]" />
+      <span class="tabbar-item__icon" v-html="iconSvg(item.icon)" />
       <span class="tabbar-item__text">{{ item.label }}</span>
     </button>
   </nav>
@@ -28,6 +28,12 @@ const icons = {
   film: `<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M4 5h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zm14 1.2 4-2.2v16l-4-2.2V6.2zM6 8v2h2V8H6zm0 4v2h2v-2H6z"/></svg>`,
   music: `<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M17 3v10.26A4 4 0 1 0 19 17V7h4V3h-6zM7 13a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/></svg>`,
   smile: `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="9" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="15" cy="10" r="1.1" fill="currentColor" stroke="none"/><path d="M8.2 14.2c1.1 1.6 2.4 2.4 3.8 2.4s2.7-.8 3.8-2.4"/></svg>`,
+}
+
+// v-html 只渲染白名单内自带的 SVG；item.icon 来自配置数据，
+// 必须用 hasOwnProperty 判定，避免 constructor 等原型链键取到非预期值。
+function iconSvg(name) {
+  return Object.prototype.hasOwnProperty.call(icons, name) ? icons[name] : ''
 }
 </script>
 
