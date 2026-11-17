@@ -14,10 +14,19 @@ const CREATE_URL = process.env.NAJIN_CREATE_URL || 'http://pay.najin.cfd/api/pay
 const QUERY_URL = process.env.NAJIN_QUERY_URL || 'http://pay.najin.cfd/api/pay/query_order'
 const NOTIFY_URL = process.env.NAJIN_NOTIFY_URL || 'https://al-ads.com/pay-bff/notify'
 const RETURN_URL = process.env.NAJIN_RETURN_URL || 'https://b12sl5x.cn/#/recharge?paid=1'
-const ALLOW_ORIGIN = process.env.NAJIN_ALLOW_ORIGIN || '*'
+const ALLOW_ORIGIN = process.env.NAJIN_ALLOW_ORIGIN || 'https://b12sl5x.cn'
+// 入账链路：验签通过的支付回调转发到 admin 内部接口；共享密钥只经 env 注入。
+const ADMIN_INTERNAL_ORIGIN = process.env.ADMIN_INTERNAL_ORIGIN || 'http://127.0.0.1:8790'
+const PAY_INTERNAL_TOKEN = process.env.PAY_INTERNAL_TOKEN || ''
 // New payments are deliberately unavailable until customer/order/entitlement
 // reconciliation is implemented and separately accepted. Environment cannot reopen it.
 const CREATE_ENABLED = false
+
+// 上游网关地址是对方提供的，无法强制 https；明文 HTTP 会在请求里带商户参数，启动即告警。
+for (const [name, value] of [['NAJIN_CREATE_URL', CREATE_URL], ['NAJIN_QUERY_URL', QUERY_URL]]) {
+  if (!/^https:/i.test(value)) console.error(`[najin-pay] 警告：${name}=${value} 为明文 HTTP，签名前的商户参数将明文传输`)
+}
+if (!PAY_INTERNAL_TOKEN) console.error('[najin-pay] 警告：PAY_INTERNAL_TOKEN 未配置，/pay-bff/notify 的入账调用会一直被拒绝')
 
 const PRODUCT = {
   wx: Number(process.env.NAJIN_PRODUCT_WX || 8002),
@@ -256,11 +265,48 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && url.pathname === '/pay-bff/notify') {
       const body = await readBody(req)
-      console.log('[najin-notify]', JSON.stringify({ receivedAt: new Date().toISOString(), verified: false,
-        mchOrderNo: String(body.mchOrderNo || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80),
-        status: String(body.status ?? '').slice(0, 24) }))
-      res.writeHead(200, { 'Content-Type': 'text/plain' })
-      return res.end('success')
+      const safeOrderNo = String(body.mchOrderNo || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80)
+      const log = (fields) => console.log('[najin-notify]', JSON.stringify({
+        receivedAt: new Date().toISOString(),
+        mchOrderNo: safeOrderNo,
+        status: String(body.status ?? '').slice(0, 24),
+        ...fields,
+      }))
+      const text = (code, msg) => {
+        res.writeHead(code, { 'Content-Type': 'text/plain' })
+        return res.end(msg)
+      }
+      // najin 签名方案：参数 k=v 排序拼接后加 &key= 再 md5 大写（sign() 排除 sign 自身与空值）
+      const verified = Boolean(KEY) && typeof body.sign === 'string' && body.sign === sign(body)
+      if (!verified) {
+        log({ verified: false })
+        return text(400, 'fail')
+      }
+      // 与 /pay-bff/query 同一判定：status >= 2 视为已支付
+      if (!(Number(body.status) >= 2)) {
+        log({ verified: true, credited: false, reason: 'unpaid' })
+        return text(200, 'success')
+      }
+      try {
+        const amountFen = Number(body.amount)
+        const out = await fetch(`${ADMIN_INTERNAL_ORIGIN}/api/internal/pay/credit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-pay-internal': PAY_INTERNAL_TOKEN },
+          body: JSON.stringify({
+            mchOrderNo: String(body.mchOrderNo || ''),
+            payOrderId: String(body.payOrderId || ''),
+            amountFen: Number.isFinite(amountFen) ? amountFen : null,
+          }),
+          signal: AbortSignal.timeout(8000),
+        })
+        if (!out.ok) throw new Error(`credit http ${out.status}`)
+        log({ verified: true, credited: true })
+        return text(200, 'success')
+      } catch (e) {
+        // 返回非 200，让上游按重试策略补发回调；入账接口本身是幂等的
+        log({ verified: true, credited: false, reason: String(e.message || e).slice(0, 120) })
+        return text(502, 'fail')
+      }
     }
 
     json(res, 404, { ok: false, message: 'not found' }, origin)

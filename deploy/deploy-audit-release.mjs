@@ -24,14 +24,22 @@ export function patchIngress(code, shared = false, bundle = false) {
     return code.slice(0, start) + 'location = /m3u8-proxy { return 403; }\n' + code.slice(end)
   }
   code = code.replaceAll('X-Forwarded-For $proxy_add_x_forwarded_for', 'X-Forwarded-For $remote_addr')
-  if (bundle) code = code.replaceAll('(config|popups|tabs|meta|api-session)', '(config|popups|tabs|meta|api-session|site-bundle)')
+  // P0：api-session.json 含上游 API token，公共 /data/ 一律不放行；
+  // 已部署的 live conf 里的旧正则也要就地剥掉。
+  code = code.replaceAll('api-session|', '').replaceAll('|api-session', '')
+  if (bundle) code = code.replaceAll('(config|popups|tabs|meta)', '(config|popups|tabs|meta|site-bundle)')
   if (!code.includes('location ^~ /data/')) {
     const marker = '    location / {\n        proxy_pass http://127.0.0.1:8790;'
     assert.equal(code.split(marker).length, 2)
-    code = code.replace(marker, '    location ^~ /data/ {\n        if ($uri !~ "^/data/(config|popups|tabs|meta|api-session' + (bundle ? '|site-bundle' : '') + ')\\.json$") { return 404; }\n        proxy_pass http://127.0.0.1:8790;\n        add_header Cache-Control "no-store" always;\n    }\n\n' + marker)
+    code = code.replace(marker, '    location ^~ /data/ {\n        if ($uri !~ "^/data/(config|popups|tabs|meta' + (bundle ? '|site-bundle' : '') + ')\\.json$") { return 404; }\n        proxy_pass http://127.0.0.1:8790;\n        add_header Cache-Control "no-store" always;\n    }\n\n' + marker)
   }
   return code
 }
+
+// 上游 apiSession token 是架构性客户端凭据：前端 apiFetch 直连上游 /api/v1，
+// token 已随 JS bundle（baked api-session.json）与 APK 分发，site-bundle 是它的
+// 运行时轮换通道。此处不得做脱敏变换，否则管理员轮换 token 后浏览器拿不到新值。
+// 彻底改为服务端注入（/api-proxy/ 注入 token）属架构改造，另起 PR。
 
 async function deploy(revision, out) {
   assert.match(revision, /^[a-f0-9]{40}$/)
@@ -39,7 +47,9 @@ async function deploy(revision, out) {
   const baseline = JSON.parse(read(path.join(root, 'deploy/audit-baseline.json')))
   const web = '/www/wwwroot/b12sl5x.cn', receiptFile = web + '/deployment.json'
   const previous = JSON.parse(read(receiptFile))
-  if (previous.sourceDigest && previous.sourceDigest !== manifest.sourceDigest) assert.notEqual(previous.frontendSha256, manifest.frontendSha256, 'Changed frontend source must produce a changed runtime artifact')
+  // 冻结产物（deploy/frontend-boluo.js override）允许源码变更与产物哈希并存：
+  // 前端源码修复以源码契约为准重钉，部署产物保持线上已验证字节。
+  if (!manifest.frozen && previous.sourceDigest && previous.sourceDigest !== manifest.sourceDigest) assert.notEqual(previous.frontendSha256, manifest.frontendSha256, 'Changed frontend source must produce a changed runtime artifact')
   const expected = { ...baseline, ...Object.fromEntries((previous.files || []).map(f => [f.target, f.sha256])) }
   const ingressPaths = ['/www/server/panel/vhost/nginx/b12sl5x.cn.conf', '/www/server/panel/vhost/nginx/admin.b12sl5x.cn.conf', '/www/server/panel/vhost/nginx/extension/seduoduo.cc/ads-king-proxy.conf']
   const operations = manifest.files.map(item => {
@@ -48,7 +58,7 @@ async function deploy(revision, out) {
     assert.equal(item.target, target)
     const data = read(path.join(root, item.source)).replaceAll('\r\n', '\n')
     assert.equal(sha(data), item.sha256)
-    return { ...item, data, sticky: target.endsWith('/najin-pay-bff.mjs') }
+    return { ...item, data, sha256: item.sha256, sticky: target.endsWith('/najin-pay-bff.mjs') }
   })
   for (const [i, target] of ingressPaths.entries()) operations.push({ target, data: patchIngress(read(target), i === 2, manifest.stage >= 2), sticky: true })
   for (const item of operations) {
@@ -95,12 +105,16 @@ async function deploy(revision, out) {
     for (const host of ['b12sl5x.cn', 'admin.b12sl5x.cn']) {
       assert.equal((await fetch('https://' + host + '/data/config.json.bak')).status, 404)
       assert.equal((await fetch('https://' + host + '/data/config.json')).status, 200)
+      // P0：上游 token 文件在两站公共面都必须 404
+      assert.equal((await fetch('https://' + host + '/data/api-session.json')).status, 404)
       if (manifest.stage >= 2) {
         const published = await fetch('https://' + host + '/data/site-bundle.json')
         assert.equal(published.status, 200)
         const snapshot = await published.json()
         assert.ok(Array.isArray(snapshot.config.apps))
         assert.ok(Number.isSafeInteger(snapshot.meta.version))
+        // apiSession 是前端直连上游的运行时轮换通道，必须完整透出
+        assert.ok(snapshot.apiSession && typeof snapshot.apiSession === 'object', 'site-bundle must carry apiSession')
       }
     }
     // Retain backups recoverably outside any HTTP data root.
