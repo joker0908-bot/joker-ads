@@ -1,5 +1,5 @@
 // Smoke coverage for the live-only admin routes backported from production
-// (pay catalog/redeem/orders, internal pay bridge, public videos, dewu-api,
+// (pay catalog/redeem/orders, internal pay bridge, public videos, boluo-api,
 // drama API keys, wallet fields). Runs against disposable data with no upstream.
 import assert from 'node:assert/strict'
 import crypto from 'node:crypto'
@@ -42,8 +42,8 @@ const child = spawn(process.execPath, ['server.mjs'], {
     PAY_INTERNAL_TOKEN: payToken, VIDEO_SOURCE: 'local', VIDEO_CATALOG_PATH: catalog, VIDEO_MEDIA_DIR: mediaDir,
     VIDEO_URL_SECRET: crypto.randomBytes(16).toString('hex'),
     DRAMA_API_KEYS_FILE: path.join(tmp, 'drama-keys.json'), DRAMA_API_KEY_FILE: path.join(tmp, 'missing.env'),
-    DEWU_ORIGIN_BASES: '', DEWU_DATA_KEY: '', DEWU_IMG_KEY: '', DEWU_FETCH_MS: '2000',
-    DEWU_CATALOG_PATH: path.join(tmp, 'dewu-catalog.json'), HUANGGUO_API_BASE: '' },
+    BOLUO_ORIGIN_BASES: '', BOLUO_DATA_KEY: '', BOLUO_IMG_KEY: '', BOLUO_FETCH_MS: '2000',
+    BOLUO_CATALOG_PATH: path.join(tmp, 'boluo-catalog.json'), HUANGGUO_API_BASE: '' },
 })
 let output = ''
 child.stdout.on('data', x => { output += x }); child.stderr.on('data', x => { output += x })
@@ -111,10 +111,10 @@ try {
   assert.equal((await call('/api/public/videos/missing')).status, 404)
   console.log('PASS public videos list/detail/signed media; bad signature and hidden items refused')
 
-  // dewu-api: CORS preflight, key required
-  const pre = await fetch(origin + '/dewu-api/api/videos', { method: 'OPTIONS' })
+  // boluo-api: CORS preflight, key required
+  const pre = await fetch(origin + '/boluo-api/api/videos', { method: 'OPTIONS' })
   assert.equal(pre.status, 204); assert.equal(pre.headers.get('access-control-allow-origin'), '*')
-  for (const p of ['/dewu-api/api/videos', '/dewu-api/api/skits', '/dewu-api/api/shows', '/dewu-api/api/videos/categories']) {
+  for (const p of ['/boluo-api/api/videos', '/boluo-api/api/skits', '/boluo-api/api/shows', '/boluo-api/api/videos/categories']) {
     assert.equal((await call(p)).status, 401, p + ' requires a key')
   }
 
@@ -128,7 +128,7 @@ try {
   password = next
   cookie = (await call('/api/admin/login', { method: 'POST', body: { username: 'live-routes', password } })).headers.get('set-cookie').split(';')[0]
   assert.equal((await call('/api/admin/drama-api-keys')).status, 200)
-  const created = await call('/api/admin/drama-api-keys', { method: 'POST', body: { remark: 'smoke', scopes: ['dewu'] } })
+  const created = await call('/api/admin/drama-api-keys', { method: 'POST', body: { remark: 'smoke', scopes: ['boluo'] } })
   assert.equal(created.status, 200)
   const key = created.json.key
   const customers = await call('/api/admin/customers')
@@ -136,16 +136,16 @@ try {
   assert.ok(JSON.stringify(customers.json).includes('diamonds'), 'admin customer list carries wallet columns')
 
   // With a valid key the route is reached (upstream is unconfigured here, so a clean JSON error is fine)
-  const keyed = await call('/dewu-api/api/videos', { headers: { 'X-Api-Key': key.secret } })
+  const keyed = await call('/boluo-api/api/videos', { headers: { 'X-Api-Key': key.secret } })
   assert.notEqual(keyed.status, 401); assert.notEqual(keyed.status, 429)
-  assert.ok(keyed.json && 'code' in keyed.json, 'dewu-api answers JSON')
-  assert.equal((await call('/dewu-api/api/videos', { headers: { Authorization: 'Bearer ' + key.secret } })).status, keyed.status)
+  assert.ok(keyed.json && 'code' in keyed.json, 'boluo-api answers JSON')
+  assert.equal((await call('/boluo-api/api/videos', { headers: { Authorization: 'Bearer ' + key.secret } })).status, keyed.status)
   assert.equal((await call('/api/admin/drama-api-keys/' + key.id, { method: 'POST', body: { paused: true } })).status, 200)
-  assert.equal((await call('/dewu-api/api/videos', { headers: { 'X-Api-Key': key.secret } })).status, 401, 'paused key refused')
+  assert.equal((await call('/boluo-api/api/videos', { headers: { 'X-Api-Key': key.secret } })).status, 401, 'paused key refused')
   assert.equal((await call('/api/admin/drama-api-keys/' + key.id, { method: 'DELETE' })).status, 200)
-  assert.equal((await call('/dewu-api/api/videos', { headers: { 'X-Api-Key': key.secret } })).status, 401, 'deleted key refused')
-  assert.equal((await call('/dewu-api/api/vseg?u=http://127.0.0.1/x&exp=1&sig=bad')).status >= 400, true, 'segment proxy refuses unsigned/loopback')
-  console.log('PASS dewu-api CORS + key/pause/delete; forced password change gates drama key admin; wallet columns in admin')
+  assert.equal((await call('/boluo-api/api/videos', { headers: { 'X-Api-Key': key.secret } })).status, 401, 'deleted key refused')
+  assert.equal((await call('/boluo-api/api/vseg?u=http://127.0.0.1/x&exp=1&sig=bad')).status >= 400, true, 'segment proxy refuses unsigned/loopback')
+  console.log('PASS boluo-api CORS + key/pause/delete; forced password change gates drama key admin; wallet columns in admin')
   assert.equal(child.exitCode, null, 'admin still running')
 } finally {
   child.kill()

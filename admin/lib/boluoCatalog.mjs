@@ -2,13 +2,13 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { SITE_DATA_DIR } from './paths.mjs'
 
-const CATALOG_PATH = process.env.DEWU_CATALOG_PATH || path.join(SITE_DATA_DIR, 'videos', 'dewu-videos-catalog.json')
-const TTL_MS = Math.max(60_000, Number(process.env.DEWU_CATALOG_TTL_MS || 6 * 3600 * 1000))
-const SEED_PAGES = Math.max(1, Number(process.env.DEWU_CATALOG_SEED_PAGES || 5))
-const PAGE_DELAY_MS = Math.max(20, Number(process.env.DEWU_CATALOG_PAGE_DELAY_MS || 120))
-const ENRICH_MAX = Number(process.env.DEWU_CATALOG_ENRICH_MAX ?? 0)
-const ENRICH_CONCURRENCY = Math.max(1, Number(process.env.DEWU_CATALOG_ENRICH_CONCURRENCY || 4))
-const MAX_PAGES = Math.max(10, Number(process.env.DEWU_CATALOG_MAX_PAGES || 800))
+const CATALOG_PATH = process.env.BOLUO_CATALOG_PATH || path.join(SITE_DATA_DIR, 'videos', 'boluo-videos-catalog.json')
+const TTL_MS = Math.max(60_000, Number(process.env.BOLUO_CATALOG_TTL_MS || 6 * 3600 * 1000))
+const SEED_PAGES = Math.max(1, Number(process.env.BOLUO_CATALOG_SEED_PAGES || 5))
+const PAGE_DELAY_MS = Math.max(20, Number(process.env.BOLUO_CATALOG_PAGE_DELAY_MS || 120))
+const ENRICH_MAX = Number(process.env.BOLUO_CATALOG_ENRICH_MAX ?? 0)
+const ENRICH_CONCURRENCY = Math.max(1, Number(process.env.BOLUO_CATALOG_ENRICH_CONCURRENCY || 4))
+const MAX_PAGES = Math.max(10, Number(process.env.BOLUO_CATALOG_MAX_PAGES || 800))
 const SKIT_PAGE_SIZE = 50
 
 const state = {

@@ -666,11 +666,11 @@ async function renderDramaApiKey(main) {
   const keys = data.keys || []
   const scopeText = (scopes) => {
     const names = Array.isArray(scopes) ? scopes : []
-    const dewu = names.includes('dewu')
+    const boluo = names.includes('boluo')
     const huangguo = names.includes('huangguo')
-    if (dewu && huangguo) return '黄果 + 得污'
+    if (boluo && huangguo) return '黄果 + 菠萝视频'
     if (huangguo) return '黄果'
-    if (dewu) return '得污'
+    if (boluo) return '菠萝视频'
     return ''
   }
   main.innerHTML = `
@@ -679,9 +679,9 @@ async function renderDramaApiKey(main) {
       <div class="form-group"><label class="form-label">备注</label><input id="drama-remark" maxlength="40" /></div>
       <div class="form-group"><label class="form-label">范围</label>
         <select id="drama-scope">
-          <option value="both">黄果 + 得污</option>
+          <option value="both">黄果 + 菠萝视频</option>
           <option value="huangguo">黄果</option>
-          <option value="dewu">得污</option>
+          <option value="boluo">菠萝视频</option>
         </select>
       </div>
       <button class="btn btn-primary" id="drama-create" type="button">创建</button>

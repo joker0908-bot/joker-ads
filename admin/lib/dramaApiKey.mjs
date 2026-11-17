@@ -3,7 +3,7 @@ import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 
-const SCOPES = ['dewu', 'huangguo']
+const SCOPES = ['boluo', 'huangguo']
 
 function registryFile() {
   return process.env.DRAMA_API_KEYS_FILE || '/etc/juhe-drama-api-keys.json'
@@ -45,9 +45,9 @@ function keyEquals(got, expected) {
 
 function legacyKey() {
   const fromFile = readEnvFile(legacyFile())
-  const fileKey = String(fromFile.DEWU_API_KEY || fromFile.HUANGGUO_API_KEY || '').trim()
+  const fileKey = String(fromFile.BOLUO_API_KEY || fromFile.HUANGGUO_API_KEY || '').trim()
   if (fileKey) return fileKey
-  return String(process.env.DEWU_API_KEY || process.env.HUANGGUO_API_KEY || '').trim()
+  return String(process.env.BOLUO_API_KEY || process.env.HUANGGUO_API_KEY || '').trim()
 }
 
 function blankRegistry() {

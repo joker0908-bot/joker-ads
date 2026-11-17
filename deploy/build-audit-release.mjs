@@ -10,7 +10,12 @@ const out = path.resolve(process.argv[3] || path.join(root, 'dist/audit-release'
 const config = JSON.parse(fs.readFileSync(path.join(root, 'deploy/audit-release.json')))
 const contract = JSON.parse(fs.readFileSync(path.join(root, 'deploy/audit-source-contract.json')))
 for (const [file, sha] of Object.entries(contract)) assert.equal(digest(fs.readFileSync(path.join(root, file), 'utf8').replaceAll('\r\n', '\n')), sha, 'Source contract changed without a runtime patch: ' + file)
-const code = patchAuditFrontend(fs.readFileSync(baseline, 'utf8'), config.stage)
+// 菠萝视频改名期冻结：deploy/frontend-boluo.js 是线上已回归验证的当前前端包，
+// 存在时直接作为发布产物，保证部署后前端字节与改名后现状一致。
+const override = path.join(root, 'deploy/frontend-boluo.js')
+const code = fs.existsSync(override)
+  ? fs.readFileSync(override, 'utf8')
+  : patchAuditFrontend(fs.readFileSync(baseline, 'utf8'), config.stage)
 const frontendSha256 = digest(code)
 const frontend = `index-audit-${config.stage}-${frontendSha256.slice(0, 12)}.js`
 const files = ['admin/server.mjs', ...fs.readdirSync(path.join(root, 'admin/lib')).filter(n => n.endsWith('.mjs')).map(n => 'admin/lib/' + n),

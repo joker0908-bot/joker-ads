@@ -5,16 +5,16 @@ import https from 'node:https'
 import path from 'node:path'
 import zlib from 'node:zlib'
 import { LIVE_DIR } from './paths.mjs'
-import * as catalog from './dewuCatalog.mjs'
+import * as catalog from './boluoCatalog.mjs'
 
 const PID = 'FBI'
-const DATA_KEY = String(process.env.DEWU_DATA_KEY || '')
-const IMG_KEY = String(process.env.DEWU_IMG_KEY || '')
+const DATA_KEY = String(process.env.BOLUO_DATA_KEY || '')
+const IMG_KEY = String(process.env.BOLUO_IMG_KEY || '')
 const DEFAULT_RES_BASE = 'https://d17e80montytxe.cloudfront.net'
-// Upstream origins come from DEWU_ORIGIN_BASES (comma-separated); none are hardcoded.
+// Upstream origins come from BOLUO_ORIGIN_BASES (comma-separated); none are hardcoded.
 const DEFAULT_BASES = []
 
-const FETCH_MS = Math.max(2000, Number(process.env.DEWU_FETCH_MS || 8000))
+const FETCH_MS = Math.max(2000, Number(process.env.BOLUO_FETCH_MS || 8000))
 const PLAY_TTL_SEC = Math.max(30, Number(process.env.VIDEO_PLAY_TTL_SEC || 300))
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
 
@@ -30,7 +30,7 @@ function httpError(status, code, message) {
 }
 
 function bases() {
-  const raw = String(process.env.DEWU_ORIGIN_BASES || '')
+  const raw = String(process.env.BOLUO_ORIGIN_BASES || '')
     .split(',')
     .map((s) => s.trim().replace(/\/$/, ''))
     .filter(Boolean)
@@ -183,7 +183,7 @@ export function mapVideo(v) {
   return {
     id,
     title: String(v?.name || v?.title || ''),
-    cover: id ? `/dewu-api/api/videos/${encodeURIComponent(id)}/cover` : '',
+    cover: id ? `/boluo-api/api/videos/${encodeURIComponent(id)}/cover` : '',
     duration: Math.round(Number(v?.time)) || 0,
     durationText: formatDuration(v?.time),
     views: Number(v?.playCnt) || 0,
@@ -194,9 +194,9 @@ export function mapVideo(v) {
     tags: normalizeTags(v?.videoTags || v?.tags).length
       ? normalizeTags(v?.videoTags || v?.tags)
       : catalog.rowTags(id),
-    source: 'dewu',
+    source: 'boluo',
     type: 'video',
-    play: id ? `/dewu-api/api/videos/${encodeURIComponent(id)}/play` : '',
+    play: id ? `/boluo-api/api/videos/${encodeURIComponent(id)}/play` : '',
   }
 }
 
@@ -237,7 +237,7 @@ export async function getVideo(id) {
     trialSeconds: Number(data?.trialPreviewSeconds) || 0,
     hasPlay: Boolean(playUrl || previewUrl),
     preview: !playUrl && Boolean(previewUrl),
-    play: `/dewu-api/api/videos/${encodeURIComponent(vid)}/play`,
+    play: `/boluo-api/api/videos/${encodeURIComponent(vid)}/play`,
     related,
     _playUrl: playUrl,
     _previewUrl: previewUrl,
@@ -255,7 +255,7 @@ function signSeg(url, exp) {
 }
 
 export function segUrl(target, exp) {
-  return `/dewu-api/api/vseg?u=${encodeURIComponent(target)}&exp=${exp}&sig=${signSeg(target, exp)}`
+  return `/boluo-api/api/vseg?u=${encodeURIComponent(target)}&exp=${exp}&sig=${signSeg(target, exp)}`
 }
 
 export function verifySeg(target, exp, sig) {
@@ -445,7 +445,7 @@ export function mapSkit(row) {
     id,
     title: String(row?.name || ''),
     intro: row?.introduction != null ? String(row.introduction) : '',
-    cover: id ? `/dewu-api/api/skits/${encodeURIComponent(id)}/cover` : '',
+    cover: id ? `/boluo-api/api/skits/${encodeURIComponent(id)}/cover` : '',
     episodes: Number(row?.total) || 0,
     finished: Boolean(row?.is_finished),
     tags: Array.isArray(row?.tags) ? row.tags.map((t) => String(t)) : [],
@@ -455,7 +455,7 @@ export function mapSkit(row) {
     likes: Number(row?.likedCntTotal) || 0,
     collects: Number(row?.collectedCntTotal) || 0,
     updated: row?.updatedDate ? String(row.updatedDate) : '',
-    source: 'dewu',
+    source: 'boluo',
     type: 'skit',
   }
 }
@@ -521,7 +521,7 @@ async function skitEpisodes(serialId) {
     duration: Math.round(Number(e?.time)) || 0,
     durationText: formatDuration(e?.time),
     unlocked: e?.hasWatchPermission !== false,
-    cover: `/dewu-api/api/skits/${encodeURIComponent(serialId)}/cover`,
+    cover: `/boluo-api/api/skits/${encodeURIComponent(serialId)}/cover`,
     _url: e?.url ? String(e.url) : '',
   }))
 }
@@ -548,7 +548,7 @@ export async function getSkit(serialId) {
   const episodes = await skitEpisodes(sid)
   if (!episodes.length) throw httpError(404, 'not_found', '该视频暂不可用')
   const meta = await skitMeta(sid)
-  const mapped = meta ? mapSkit(meta) : { id: sid, title: '', source: 'dewu', type: 'skit' }
+  const mapped = meta ? mapSkit(meta) : { id: sid, title: '', source: 'boluo', type: 'skit' }
   const categoryName = await skitCategoryName(mapped.categoryIds)
   return { ...mapped, categoryName, episode_list: episodes.map(({ _url, ...e }) => e) }
 }
@@ -611,7 +611,7 @@ export async function writeSkitCover(serialId, res) {
   return true
 }
 
-export function clearDewuState() {
+export function clearBoluoState() {
   sid = ''
   activeBase = null
   coverPathCache.clear()
