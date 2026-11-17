@@ -2,6 +2,8 @@ import { reactive, readonly } from 'vue'
 import { fetchJsonTimed } from '../api/timedFetch.js'
 
 const FP_KEY = 'dw_device_fp'
+// 客户凭据首选后端签发的 HttpOnly cookie `dw_card`；localStorage 的 dw_card_token
+// 仅作为 claim 等 POST 请求 body 中 cardToken 字段的载荷来源，不再拼进 URL query。
 const TOKEN_KEY = 'dw_card_token'
 const SHOWN_KEY = 'dw_card_shown'
 let claimInFlight = null

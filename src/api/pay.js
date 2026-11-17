@@ -1,5 +1,10 @@
 // Local wallet: package catalog, diamond→VIP redeem and order history are
 // served by the admin service; order creation/query goes through pay-bff.
+//
+// 凭据说明：后端首选 HttpOnly cookie `dw_card`（随 credentials:'include' 自动携带），
+// 其次认 X-Card-Token 请求头；localStorage 里的 dw_card_token 仅作为
+// X-Card-Token 头与 claim/redeem 等 POST body 的 cardToken 载荷来源，
+// 不再拼进 URL query。
 const TOKEN_KEY = 'dw_card_token'
 
 export function cardToken() {
@@ -25,9 +30,10 @@ export async function fetchPayCatalog() {
 }
 
 export async function fetchPayOrders() {
-  const res = await fetch(`/api/public/pay/orders?token=${encodeURIComponent(cardToken())}`, {
+  // 客户凭据走 HttpOnly cookie（credentials:'include'）或 X-Card-Token 头，禁止带 ?token= query
+  const res = await fetch('/api/public/pay/orders', {
     credentials: 'include',
-    headers: { Accept: 'application/json' },
+    headers: { Accept: 'application/json', 'X-Card-Token': cardToken() },
   })
   const json = await readJson(res)
   return res.ok && Array.isArray(json.orders) ? json.orders : []

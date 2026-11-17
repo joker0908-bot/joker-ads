@@ -411,6 +411,24 @@ function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
 
+// 内联事件属性专用转义：先 JSON.stringify 生成合法 JS 字符串字面量，再做 HTML 转义。
+// 只做 escapeHtml 不够——属性解析会把 &#39; 还原成 '，单引号仍可逃逸出 JS 字符串。
+function jsq(value) {
+  return escapeHtml(JSON.stringify(String(value ?? '')));
+}
+
+// 图片地址白名单：仅放行 http(s)、站内相对路径与 data:image/ 内联图，拒绝 javascript: 等协议。
+function safeImg(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  if (/^data:image\//i.test(s)) return s;
+  try {
+    const p = new URL(s, location.origin).protocol.toLowerCase();
+    if (p === 'http:' || p === 'https:') return s;
+  } catch {}
+  return '';
+}
+
 function api(path, options = {}) {
   const isForm = options.body instanceof FormData;
   return fetch(path, {
@@ -581,7 +599,7 @@ async function renderResources() {
   const body = await api('/api/admin/resources?lang=zh');
   state.resources = body.resources || [];
   document.getElementById('resource-table').innerHTML = state.resources.length ? state.resources.map((r) => `<tr>
-    <td><img class="img-thumb" src="${escapeHtml(r.coverUrl || '')}" onerror="this.src='https://picsum.photos/seed/admin-${escapeHtml(r.id)}/120/90'"></td>
+    <td><img class="img-thumb" src="${escapeHtml(safeImg(r.coverUrl || ''))}" onerror="this.onerror=null;this.src=${jsq(`https://picsum.photos/seed/admin-${r.id}/120/90`)}"></td>
     <td><div class="list-title">${escapeHtml(r.titleZh)}</div><div class="list-sub">/${escapeHtml(r.slug)}</div></td>
     <td><span class="badge badge-red">${escapeHtml(r.category || '-')}</span></td>
     <td><span class="badge ${r.fileUrl ? 'badge-green' : 'badge-gray'}" title="${escapeHtml(r.fileUrl || '')}">${r.fileUrl ? '已上传' : '未上传'}</span></td>
@@ -590,7 +608,7 @@ async function renderResources() {
     <td><span class="badge ${r.active ? 'badge-green' : 'badge-gray'}">${r.active ? '上架' : '下架'}</span></td>
     <td><div class="action-btns">
       <a class="btn btn-gray btn-sm" href="/r/${encodeURIComponent(r.slug)}" target="_blank">页面</a>
-      ${canWrite('resources') ? `<button class="btn btn-blue btn-sm" onclick="openResourceModal('${escapeHtml(r.id)}')">编辑</button><button class="btn btn-danger btn-sm" onclick="confirmAction('确认删除该资源？',()=>deleteResource('${escapeHtml(r.id)}'))">删除</button>` : ''}
+      ${canWrite('resources') ? `<button class="btn btn-blue btn-sm" onclick="openResourceModal(${jsq(r.id)})">编辑</button><button class="btn btn-danger btn-sm" onclick="confirmAction('确认删除该资源？',()=>deleteResource(${jsq(r.id)}))">删除</button>` : ''}
     </div></td>
   </tr>`).join('') : '<tr class="empty-row"><td colspan="8">暂无资源</td></tr>';
 }
@@ -664,7 +682,7 @@ async function saveResource() {
   if (!payload.file_url) return document.getElementById('res-err').textContent = '请先上传资源文件';
   const rid = document.getElementById('res-id').value;
   try {
-    await api(rid ? `/api/admin/resources/${rid}` : '/api/admin/resources', { method: rid ? 'PUT' : 'POST', body: JSON.stringify(payload) });
+    await api(rid ? `/api/admin/resources/${encodeURIComponent(rid)}` : '/api/admin/resources', { method: rid ? 'PUT' : 'POST', body: JSON.stringify(payload) });
     closeModal('resource-modal');
     toast('资源已保存');
     renderResources();
@@ -674,7 +692,7 @@ async function saveResource() {
 }
 
 async function deleteResource(id) {
-  await api(`/api/admin/resources/${id}`, { method: 'DELETE' });
+  await api(`/api/admin/resources/${encodeURIComponent(id)}`, { method: 'DELETE' });
   toast('资源已删除');
   renderResources();
 }
@@ -683,7 +701,7 @@ async function renderCategories() {
   await loadCategories();
   document.getElementById('cat-list').innerHTML = state.categories.length ? state.categories.map((c) => `<div class="list-row">
     <div><div class="list-title">${escapeHtml(c.nameZh)}${c.nameEn ? ` / ${escapeHtml(c.nameEn)}` : ''}</div><div class="list-sub">排序 ${Number(c.sortOrder || 0)} · ${c.active ? '启用' : '停用'}</div></div>
-    <div class="action-btns">${canWrite('categories') ? `<button class="btn btn-blue btn-sm" onclick="editCategory('${escapeHtml(c.id)}')">编辑</button><button class="btn btn-danger btn-sm" onclick="confirmAction('确认删除该分类？',()=>deleteCategory('${escapeHtml(c.id)}'))">删除</button>` : ''}</div>
+    <div class="action-btns">${canWrite('categories') ? `<button class="btn btn-blue btn-sm" onclick="editCategory(${jsq(c.id)})">编辑</button><button class="btn btn-danger btn-sm" onclick="confirmAction('确认删除该分类？',()=>deleteCategory(${jsq(c.id)}))">删除</button>` : ''}</div>
   </div>`).join('') : '<div style="color:#555;text-align:center;padding:20px;">暂无分类</div>';
 }
 
@@ -714,7 +732,7 @@ async function saveCategory() {
   if (!payload.name_zh) return toast('请填写中文分类名称');
   const cid = document.getElementById('cat-id').value;
   try {
-    await api(cid ? `/api/admin/categories/${cid}` : '/api/admin/categories', { method: cid ? 'PUT' : 'POST', body: JSON.stringify(payload) });
+    await api(cid ? `/api/admin/categories/${encodeURIComponent(cid)}` : '/api/admin/categories', { method: cid ? 'PUT' : 'POST', body: JSON.stringify(payload) });
     resetCategoryForm();
     toast('分类已保存');
     renderCategories();
@@ -724,7 +742,7 @@ async function saveCategory() {
 }
 
 async function deleteCategory(id) {
-  await api(`/api/admin/categories/${id}`, { method: 'DELETE' });
+  await api(`/api/admin/categories/${encodeURIComponent(id)}`, { method: 'DELETE' });
   toast('分类已删除');
   renderCategories();
 }
@@ -734,9 +752,9 @@ async function renderAds() {
   state.ads = body.ads || [];
   const slotLabel = { banner_top:'顶部横幅', sidebar:'侧边栏', card_inline:'列表内嵌', download_button:'下载按钮/弹窗' };
   document.getElementById('ad-list').innerHTML = state.ads.length ? state.ads.map((a) => `<div class="card" style="display:flex;gap:18px;align-items:flex-start;">
-    <img src="${escapeHtml(a.imageUrl || '')}" class="img-thumb" style="width:150px;height:82px;" onerror="this.src='https://picsum.photos/seed/ad-${escapeHtml(a.id)}/180/100'">
-    <div style="flex:1;min-width:0;"><div class="list-title">${escapeHtml(a.titleZh)}</div><div style="margin:6px 0;"><span class="badge badge-blue">${slotLabel[a.slot] || a.slot}</span> <span class="badge ${a.active ? 'badge-green' : 'badge-gray'}">${a.active ? '启用' : '停用'}</span></div><div class="link-cell" title="${escapeHtml(a.linkUrl)}">${escapeHtml(a.linkUrl || '-')}</div></div>
-    <div class="action-btns">${canWrite('ads') ? `<button class="btn btn-blue btn-sm" onclick="openAdModal('${escapeHtml(a.id)}')">编辑</button><button class="btn btn-danger btn-sm" onclick="confirmAction('确认删除该广告？',()=>deleteAd('${escapeHtml(a.id)}'))">删除</button>` : ''}</div>
+    <img src="${escapeHtml(safeImg(a.imageUrl || ''))}" class="img-thumb" style="width:150px;height:82px;" onerror="this.onerror=null;this.src=${jsq(`https://picsum.photos/seed/ad-${a.id}/180/100`)}">
+    <div style="flex:1;min-width:0;"><div class="list-title">${escapeHtml(a.titleZh)}</div><div style="margin:6px 0;"><span class="badge badge-blue">${escapeHtml(slotLabel[a.slot] || a.slot || '-')}</span> <span class="badge ${a.active ? 'badge-green' : 'badge-gray'}">${a.active ? '启用' : '停用'}</span></div><div class="link-cell" title="${escapeHtml(a.linkUrl)}">${escapeHtml(a.linkUrl || '-')}</div></div>
+    <div class="action-btns">${canWrite('ads') ? `<button class="btn btn-blue btn-sm" onclick="openAdModal(${jsq(a.id)})">编辑</button><button class="btn btn-danger btn-sm" onclick="confirmAction('确认删除该广告？',()=>deleteAd(${jsq(a.id)}))">删除</button>` : ''}</div>
   </div>`).join('') : '<div class="card" style="text-align:center;color:#555;">暂无广告</div>';
 }
 
@@ -779,7 +797,7 @@ async function saveAd() {
   if (!payload.title_zh) return document.getElementById('ad-err').textContent = '请填写中文广告名称';
   const aid = document.getElementById('ad-id').value;
   try {
-    await api(aid ? `/api/admin/ads/${aid}` : '/api/admin/ads', { method: aid ? 'PUT' : 'POST', body: JSON.stringify(payload) });
+    await api(aid ? `/api/admin/ads/${encodeURIComponent(aid)}` : '/api/admin/ads', { method: aid ? 'PUT' : 'POST', body: JSON.stringify(payload) });
     closeModal('ad-modal');
     toast('广告已保存');
     renderAds();
@@ -789,7 +807,7 @@ async function saveAd() {
 }
 
 async function deleteAd(id) {
-  await api(`/api/admin/ads/${id}`, { method: 'DELETE' });
+  await api(`/api/admin/ads/${encodeURIComponent(id)}`, { method: 'DELETE' });
   toast('广告已删除');
   renderAds();
 }
@@ -872,9 +890,9 @@ async function renderAdmins() {
   document.getElementById('admin-table').innerHTML = state.admins.map((a) => `<tr>
     <td style="font-weight:700;color:#ddd;">${escapeHtml(a.username)}</td>
     <td>${escapeHtml(a.nickname || '-')}</td>
-    <td><span class="badge ${a.role === 'super' ? 'badge-red' : 'badge-blue'}">${roles[a.role] || a.role}</span></td>
+    <td><span class="badge ${a.role === 'super' ? 'badge-red' : 'badge-blue'}">${escapeHtml(roles[a.role] || a.role)}</span></td>
     <td><span class="badge ${a.active ? 'badge-green' : 'badge-gray'}">${a.active ? '启用' : '停用'}${a.mustChangePassword ? ' · 待改密' : ''}</span></td>
-    <td><div class="action-btns"><button class="btn btn-blue btn-sm" onclick="openAdminModal('${escapeHtml(a.id)}')">编辑</button>${a.id !== state.user.id ? `<button class="btn btn-danger btn-sm" onclick="confirmAction('确认删除该管理员？',()=>deleteAdmin('${escapeHtml(a.id)}'))">删除</button>` : ''}</div></td>
+    <td><div class="action-btns"><button class="btn btn-blue btn-sm" onclick="openAdminModal(${jsq(a.id)})">编辑</button>${a.id !== state.user.id ? `<button class="btn btn-danger btn-sm" onclick="confirmAction('确认删除该管理员？',()=>deleteAdmin(${jsq(a.id)}))">删除</button>` : ''}</div></td>
   </tr>`).join('');
 }
 
@@ -912,7 +930,7 @@ async function saveAdmin() {
   const aid = document.getElementById('adm-id').value;
   if (!payload.username) return document.getElementById('adm-err').textContent = '请填写账号';
   try {
-    await api(aid ? `/api/admin/admins/${aid}` : '/api/admin/admins', { method: aid ? 'PUT' : 'POST', body: JSON.stringify(payload) });
+    await api(aid ? `/api/admin/admins/${encodeURIComponent(aid)}` : '/api/admin/admins', { method: aid ? 'PUT' : 'POST', body: JSON.stringify(payload) });
     closeModal('admin-modal');
     toast('管理员已保存');
     renderAdmins();
@@ -922,7 +940,7 @@ async function saveAdmin() {
 }
 
 async function deleteAdmin(id) {
-  await api(`/api/admin/admins/${id}`, { method: 'DELETE' });
+  await api(`/api/admin/admins/${encodeURIComponent(id)}`, { method: 'DELETE' });
   toast('管理员已删除');
   renderAdmins();
 }
@@ -964,8 +982,9 @@ function setResourceUploadStatus(type, tone, message, imageUrl = '') {
   status.className = ['upload-status', 'show', tone].filter(Boolean).join(' ');
   text.textContent = message;
   if (preview) {
-    if (imageUrl) {
-      preview.src = imageUrl;
+    const safe = safeImg(imageUrl);
+    if (safe) {
+      preview.src = safe;
       preview.style.display = 'block';
     } else {
       preview.removeAttribute('src');
@@ -1064,7 +1083,7 @@ async function uploadInto(fileInputId, targetInputId, kind, previewId = '') {
 }
 
 function previewImage(inputId, imageId) {
-  const src = document.getElementById(inputId).value.trim();
+  const src = safeImg(document.getElementById(inputId).value);
   const img = document.getElementById(imageId);
   if (!src) {
     img.style.display = 'none';
