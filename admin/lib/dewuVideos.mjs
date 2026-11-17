@@ -8,15 +8,11 @@ import { LIVE_DIR } from './paths.mjs'
 import * as catalog from './dewuCatalog.mjs'
 
 const PID = 'FBI'
-const DATA_KEY = 'tL3LkTOEouYphOPB94wJpbtEEUHJ4hI5'
-const IMG_KEY = '82758dd12749c777ef579f1839ceea6a'
+const DATA_KEY = String(process.env.DEWU_DATA_KEY || '')
+const IMG_KEY = String(process.env.DEWU_IMG_KEY || '')
 const DEFAULT_RES_BASE = 'https://d17e80montytxe.cloudfront.net'
-const DEFAULT_BASES = [
-  'https://deuwy.jcd9nw.com',
-  'https://4p3kb.et8h6.cc',
-  'https://34.92.209.217:16888',
-  'https://180.188.198.189:16888',
-]
+// Upstream origins come from DEWU_ORIGIN_BASES (comma-separated); none are hardcoded.
+const DEFAULT_BASES = []
 
 const FETCH_MS = Math.max(2000, Number(process.env.DEWU_FETCH_MS || 8000))
 const PLAY_TTL_SEC = Math.max(30, Number(process.env.VIDEO_PLAY_TTL_SEC || 300))

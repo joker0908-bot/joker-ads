@@ -162,6 +162,7 @@
     <main id="main">
       <section class="page active" id="page-dashboard">
         <div class="page-header"><span class="page-title">控制台</span><span style="font-size:13px;color:#555;" id="dash-time"></span></div>
+        <div id="password-notice" class="notice" style="display:none;">当前账号仍在使用初始化密码，请尽快点击右上角“修改密码”。</div>
         <div class="metric-grid" id="metrics"></div>
         <div class="source-grid">
           <div class="card">
@@ -180,6 +181,7 @@
           <span class="page-title">资源管理</span>
           <div class="page-actions"><button class="btn btn-primary write-resources" onclick="openResourceModal()">新增资源</button></div>
         </div>
+        <div class="notice">前台不展示分类筛选按钮；这里的分类只用于后台管理、标签展示和统计归档。</div>
         <div class="card" style="padding:0;overflow:hidden;"><table><thead><tr><th>封面</th><th>资源</th><th>分类</th><th>文件</th><th>下载量</th><th>排序</th><th>状态</th><th>操作</th></tr></thead><tbody id="resource-table"></tbody></table></div>
       </section>
 
@@ -206,6 +208,7 @@
           <span class="page-title">广告管理</span>
           <button class="btn btn-primary write-ads" onclick="openAdModal()">新增广告位</button>
         </div>
+        <div class="notice">支持顶部横幅、侧边栏、列表内嵌、下载按钮/下载确认弹窗广告。图片可上传，也可填写外链。</div>
         <div id="ad-list"></div>
       </section>
 
@@ -503,6 +506,7 @@ function enterAdmin() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('admin-screen').style.display = 'flex';
   document.getElementById('user-badge').textContent = `${state.user.nickname || state.user.username} · ${roles[state.user.role] || state.user.role}`;
+  document.getElementById('password-notice').style.display = state.user.mustChangePassword ? 'block' : 'none';
   setupNav();
   if (state.user.mustChangePassword) {
     openPasswordModal();
@@ -1084,6 +1088,7 @@ async function changePassword() {
   try {
     await api('/api/admin/change-password', { method: 'POST', body: JSON.stringify({ oldPassword, newPassword }) });
     state.user.mustChangePassword = false;
+    document.getElementById('password-notice').style.display = 'none';
     closeModal('password-modal');
     toast('密码已修改');
     showPage(canRead(state.page) ? state.page : 'dashboard');
