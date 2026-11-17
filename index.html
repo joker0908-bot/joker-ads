@@ -48,7 +48,7 @@
     <div id="app"></div>
     <script>
       (function () {
-        // Old (Dewu*) and new (Boluo*) APKs inject differently named bridges; expose both names.
+        // Old (Boluo*) and new (Boluo*) APKs inject differently named bridges; expose both names.
         var w = window
         function alias(a, b) {
           try {
@@ -62,7 +62,7 @@
             Object.defineProperty(w, b, { configurable: true, get: function () { return v }, set: function (x) { v = x } })
           } catch (e) {}
         }
-        alias('DewuBridge', 'BoluoBridge')
+        alias('BoluoBridge', 'BoluoBridge')
       })()
     </script>
     <script type="module" src="/src/main.js"></script>

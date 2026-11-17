@@ -8,6 +8,8 @@ WorkingDirectory=/opt/ads-king
 EnvironmentFile=/etc/ads-king/najin-pay.env
 ExecStart=/usr/bin/node /opt/ads-king/najin-pay-bff.mjs
 Restart=on-failure
+User=www
+Group=www
 RestartSec=3
 
 [Install]

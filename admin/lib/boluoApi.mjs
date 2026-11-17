@@ -21,8 +21,8 @@ export function mapShow(show) {
     tags: Array.isArray(show.tags) ? show.tags.map((tag) => String(tag)) : [],
     episodes: Number(show.episodes) || 0,
     intro: show.intro != null ? String(show.intro) : '',
-    source: 'dewu',
-    cover: show.cover ? `/dewu-api/api/cover/${encodeURIComponent(id)}` : '',
+    source: 'boluo',
+    cover: show.cover ? `/boluo-api/api/cover/${encodeURIComponent(id)}` : '',
     ...(show.content_updated_at ? { content_updated_at: String(show.content_updated_at) } : {}),
   }
 }
@@ -51,7 +51,7 @@ export function rewritePlaylist(text, videoId, exp, sig) {
     if (!trimmed || trimmed.startsWith('#')) return line
     const safe = huangguo.safeMediaPath(trimmed)
     if (!safe) return line
-    return `/dewu-api/api/seg?id=${encodeURIComponent(videoId)}&p=${encodeURIComponent(safe)}&exp=${exp}&sig=${sig}`
+    return `/boluo-api/api/seg?id=${encodeURIComponent(videoId)}&p=${encodeURIComponent(safe)}&exp=${exp}&sig=${sig}`
   }).join('\n')
 }
 

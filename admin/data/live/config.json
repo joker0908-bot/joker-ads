@@ -1,6 +1,6 @@
 {
   "site": {
-    "name": "菠萝Y频",
+    "name": "菠萝视频",
     "tagline": "成人版",
     "logo": "/brand/logo.png"
   },
@@ -28,7 +28,7 @@
   "tabbar": [
     {
       "id": "invite",
-      "label": "菠萝Y频",
+      "label": "菠萝视频",
       "icon": "home"
     },
     {
