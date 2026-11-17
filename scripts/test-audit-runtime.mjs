@@ -9,12 +9,18 @@ const dir = path.resolve(process.env.AUDIT_BUNDLE_OUT || 'dist/audit-release')
 const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json')))
 assert.ok(manifest.stage >= 3)
 const code = fs.readFileSync(path.join(dir, manifest.frontend), 'utf8')
+// manifest.frozen 表示发布产物是线上已验证的冻结包，不含审计插桩函数；
+// 此时 shipped 侧变体不适用，仅运行 source 侧回归。
+const frozen = Boolean(manifest.frozen)
+const variants = frozen ? ['source'] : ['source', 'shipped']
 const ast = parse(code, { sourceType: 'module' })
 const helper = ast.program.body.find(node => node.type === 'FunctionDeclaration' && node.id.name === 'auditPlayback')
-assert.ok(helper)
+assert.ok(helper || frozen)
 const tick = async () => { for (let i = 0; i < 8; i++) await Promise.resolve() }
 function deferred() { let resolve; const promise = new Promise(r => { resolve = r }); return { promise, resolve } }
-for (const [label, functionCode, name] of [['source', createPlaybackSession.toString(), 'createPlaybackSession'], ['shipped', code.slice(helper.start, helper.end), 'auditPlayback']]) {
+const playbackVariants = [['source', createPlaybackSession.toString(), 'createPlaybackSession']]
+if (helper) playbackVariants.push(['shipped', code.slice(helper.start, helper.end), 'auditPlayback'])
+for (const [label, functionCode, name] of playbackVariants) {
   const timers = new Map(); let timerId = 0
   const ctx = vm.createContext({ setTimeout: (fn, delay) => { const id = ++timerId; timers.set(id, { fn, delay }); return id }, clearTimeout: id => timers.delete(id) })
   vm.runInContext(functionCode, ctx)
@@ -122,6 +128,7 @@ for (const [label, functionCode, name] of [['source', createPlaybackSession.toSt
   assert.equal(timers.size, 0)
   console.log('PASS ' + label + ': decoded readiness; persistent fatal fallback; first-segment failure; A→B; stale import; ten-second deadline; final error; teardown')
 }
+if (!frozen) {
 let relatedNode
 function visit(node) {
   if (!node || typeof node !== 'object') return
@@ -144,6 +151,7 @@ await aRelated
 assert.deepEqual(JSON.parse(JSON.stringify(state.value)), expected)
 assert.ok(code.includes('En(()=>{++r;loadController?.abort();m()})'), 'shipped unmount invalidates sequence and cancels requests')
 console.log('PASS shipped related recommendations reject delayed previous generation; unmount hook wired')
+}
 
 function topFunction(name) {
   const node = ast.program.body.find(n => n.type === 'FunctionDeclaration' && n.id.name === name)
@@ -162,7 +170,7 @@ function componentFunctions(component) {
   return name => { const n = setup.body.find(n => n.type === 'FunctionDeclaration' && n.id.name === name); assert.ok(n, name); return code.slice(n.start, n.end) }
 }
 const { sourceFunction } = await import('../deploy/audit-frontend-stage2.mjs')
-for (const variant of ['source','shipped']) {
+for (const variant of variants) {
   const timers = new Map(); let timerId = 0
   const calls = []
   let responder = async () => ({ ok: true, json: async () => ({ data: [] }) })
@@ -225,8 +233,8 @@ for (const variant of ['source','shipped']) {
   console.log('PASS '+variant+': encrypted cover body has five-second deadline and failed cache entry is evicted')
 }
 
-const shorts = componentFunctions('DouyinPage')
-for (const variant of ['source', 'shipped']) {
+const shorts = frozen ? null : componentFunctions('DouyinPage')
+for (const variant of variants) {
   const fallback = { douyin: { items: [{ user: 'fixture', tags: [], shares: 0 }] } }
   const ctx = vm.createContext({ tabsFallback: fallback, Ge: fallback })
   vm.runInContext(variant === 'source' ? sourceFunction('src/views/DouyinPage.vue', 'hydrateShortList') : shorts('C'), ctx)
@@ -236,7 +244,7 @@ for (const variant of ['source', 'shipped']) {
   assert.equal(items[0].coverSrc, '')
   console.log('PASS ' + variant + ': list renders synchronously before independent cover requests')
 }
-for (const variant of ['source','shipped']) {
+for (const variant of variants) {
   const videos=[0,1].map(()=>({src:'',isConnected:true,readyState:0,plays:0,listeners:new Map(),
     pause(){},removeAttribute(){this.src=''},load(){this.readyState=0},play(){this.plays++;return Promise.resolve()},
     addEventListener(n,f){this.listeners.set(n,f)},removeEventListener(n,f){if(this.listeners.get(n)===f)this.listeners.delete(n)}}))
@@ -258,9 +266,9 @@ for (const variant of ['source','shipped']) {
 }
 
 assert.ok(manifest.stage >= 5, 'current regression requires the stage-five runtime')
-const popupFunctions = componentFunctions('AdPopup')
-const featuredFunctions = componentFunctions('FeaturedPage')
-for (const variant of ['source','shipped']) {
+const popupFunctions = frozen ? null : componentFunctions('AdPopup')
+const featuredFunctions = frozen ? null : componentFunctions('FeaturedPage')
+for (const variant of variants) {
   const ctx=vm.createContext({ mediaUrl:v=>v, ia:v=>v, formatDuration:v=>v, Wo:v=>v })
   const program=variant==='source'
     ? ['formatCount','parseViewCount','normalizeVideo'].map(n=>sourceFunction('src/api/normalize.js',n)).concat(sourceFunction('src/views/FeaturedPage.vue','sortFeaturedList'))
@@ -273,7 +281,7 @@ for (const variant of ['source','shipped']) {
   assert.deepEqual(Array.from(sort(fallback,'最热'),v=>v.id),['b','c','a','zero'])
   console.log('PASS '+variant+': hottest uses unrounded raw count; w/万 fallback; zero priority; stable ties')
 }
-for (const variant of ['source','shipped']) {
+for (const variant of variants) {
   const refs={ ads:{value:[{name:'bad',image:'/bad.ceb',url:'https://example.invalid/A'},{name:'good',image:'/good.png',url:'https://example.invalid/B'}]}, grid:{value:[]}, index:{value:0}, mode:{value:'image'}, visible:{value:false}, src:{value:''}, href:{value:''}, current:{value:null}, length:{value:2} }
   const events=[],storage=new Map(),timers=new Map();let timerId=0
   const ctx=vm.createContext({afterAds:refs.ads,d:refs.ads,gridAds:refs.grid,o:refs.grid,index:refs.index,r:refs.index,mode:refs.mode,l:refs.mode,visible:refs.visible,f:refs.visible,currentSrc:refs.src,C:refs.src,currentHref:refs.href,s:refs.href,currentAd:refs.current,auditCurrentAd:refs.current,queueLen:refs.length,h:refs.length,
@@ -306,7 +314,7 @@ for (const variant of ['source','shipped']) {
   assert.equal(refs.visible.value,false,'a completed queue does not reopen on configuration polling')
   console.log('PASS '+variant+': bad image skipped; correct index/link/click; no repeated B; ordinary image error; queue invalidation')
 }
-for (const variant of ['source','shipped']) {
+for (const variant of variants) {
   const state={ready:false,customerId:'',cardNo:'',inviteCode:'',inviteCount:0,error:''},storage=new Map([['dw_device_fp','stable-fixture-fp']])
   const calls=[];let responder=async()=>({customerId:'DW-QA',cardNo:'CARD-QA',inviteCode:'1234567890123',inviteCount:0,token:'fixture-token'})
   const request=async(url,options)=>{calls.push({url,options});return responder(url,options)}
@@ -339,7 +347,7 @@ for (const variant of ['source','shipped']) {
 }
 
 assert.ok(manifest.stage >= 6, 'automatic configuration sync requires the stage-six artifact')
-for (const variant of ['source', 'shipped']) {
+for (const variant of variants) {
   const state={ready:false,error:'',version:0,config:{apps:[]},popups:{},tabs:{}}
   const timers=new Map(),calls=[];let timerId=0
   const emitter=()=>({listeners:new Map(),addEventListener(name,fn){if(!this.listeners.has(name))this.listeners.set(name,new Set());this.listeners.get(name).add(fn)},removeEventListener(name,fn){this.listeners.get(name)?.delete(fn)},emit(name){for(const fn of this.listeners.get(name)||[])fn()}})
