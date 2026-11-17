@@ -6,15 +6,15 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="theme-color" content="#0B0716" />
+    <meta name="theme-color" content="#0b0716" />
     <meta name="apple-mobile-web-app-title" content="菠萝视频" />
     <meta name="application-name" content="菠萝视频" />
     <meta name="description" content="菠萝视频 · 成人版" />
     <meta name="format-detection" content="telephone=no" />
     <meta name="referrer" content="no-referrer" />
     <title>菠萝视频</title>
-    <link rel="icon" type="image/png" href="/favicon.png" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" href="/boluo-favicon.png" />
+    <link rel="apple-touch-icon" href="/boluo-apple-touch-icon.png" />
     <script>
       (function () {
         var SHELL_MAX = 460
@@ -46,6 +46,25 @@
   </head>
   <body>
     <div id="app"></div>
+    <script>
+      (function () {
+        // Old (Dewu*) and new (Boluo*) APKs inject differently named bridges; expose both names.
+        var w = window
+        function alias(a, b) {
+          try {
+            if (a in w || b in w) {
+              if (!(a in w)) w[a] = w[b]
+              if (!(b in w)) w[b] = w[a]
+              return
+            }
+            var v
+            Object.defineProperty(w, a, { configurable: true, get: function () { return v }, set: function (x) { v = x } })
+            Object.defineProperty(w, b, { configurable: true, get: function () { return v }, set: function (x) { v = x } })
+          } catch (e) {}
+        }
+        alias('DewuBridge', 'BoluoBridge')
+      })()
+    </script>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
