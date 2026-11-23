@@ -1,5 +1,12 @@
 # 唯一生产环境与发布记录
 
+## 2026-11-23 腾讯 VOD 边缘节点宕机事件与 dewu-api X-Original-URI 修复
+
+- **事件**：腾讯 VOD 联通边缘 `116.162.172.54`（`tlgag.zzzjrcbank.com`、`4yyni.xiaomayipt.com` 经 `*.sched.vodtylego.tdnsvod1.cn` 唯一下发 IP）整机宕机且调度未摘除。上游每次 `/play` 动态分配 CDN，约 55-65% 播放落到这两个域名，`vseg` 回源 TCP 超时 → 502 → APP 视频不能放。与 11-17 部署无关（11-18 后零变更；huangguo 线、cloudfront、btkqgz 源同期健康）。
+- **热修（服务器侧，非本提交内容）**：`/etc/hosts` 钉 `tlgag.zzzjrcbank.com`→`119.39.203.124`、`4yyni.xiaomayipt.com`→`58.251.62.53`（已实测腾讯 `sign=` 不绑 edge IP，多个活 edge 返回同内容）；备份 `/etc/hosts.bak-vodpin-*`。**上游调度修复后须删除这两行**。`BOLUO_FETCH_MS` 8000→30000（`/etc/ads-king/admin.env`，备份 `admin.env.bak-fetchms-*`），消除远端 edge 慢取数的残余超时。
+- **本提交修复**：`/dewu-api/` 转发块补 `proxy_set_header X-Original-URI $request_uri;`——Express `dewuLegacyPath()` 靠它识别原前缀放行遗留 `?key=`；此前转发层不透传，`/dewu-api/...?key=` 恒 401（审计遗留缺陷，当前聚合方走 header、实际命中≈0）。`patchIngress` 幂等补同一行，对已部署 live conf 就地生效。
+- **遗留待办**：上报上游/juhe 推腾讯摘除坏节点；`PLAY_TTL_SEC`×聚合端 m3u8 缓存的 410 风险（11-20 曾爆发 3.4 万，双重编码 u= 客户端 bug 叠加）；`ufiwf.btkqgz.com` 间歇性抖动观察中。
+
 ## 2026-11-17 审计修复与 CI 强制命令入库
 
 - **P0**：公共 `/data/` 不再放行 `api-session.json`（上游 API token 曾可被任何人直接下载）。`b12sl5x.cn.conf` 的 allowlist 正则已删 `api-session`；`deploy-audit-release.mjs` 的 `patchIngress` 会就地剥除线上 conf 中残留的 `api-session`（含 admin 子域注入块），部署后断言两站 `/data/api-session.json` 返回 404。**注意**：`/data/site-bundle.json` 中的 `apiSession`（含 token/uid）**刻意保留**——它是前端 `apiFetch` 直连上游 `/api/v1` 的运行时轮换通道，token 同样 baked 进 JS bundle 与 APK，属架构性客户端凭据而非秘钥；剥掉会导致管理员轮换 token 后浏览器拿不到新值。彻底改为服务端注入（`/api-proxy/` 注入 token、前端零凭据）属架构改造，另起 PR。

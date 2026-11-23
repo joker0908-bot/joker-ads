@@ -24,6 +24,13 @@ export function patchIngress(code, shared = false, bundle = false) {
     return code.slice(0, start) + 'location = /m3u8-proxy { return 403; }\n' + code.slice(end)
   }
   code = code.replaceAll('X-Forwarded-For $proxy_add_x_forwarded_for', 'X-Forwarded-For $remote_addr')
+  // /dewu-api 遗留前缀：Express 仅对经该前缀到达的请求放行 ?key=，识别靠
+  // X-Original-URI；转发层不透传时 query key 恒 401（2026-11-23 播放故障确认）。
+  if (code.includes('location ^~ /dewu-api/') && !code.includes('X-Original-URI')) {
+    const marker = 'rewrite ^/dewu-api/(.*)$ /boluo-api/$1 break;'
+    assert.ok(code.includes(marker), 'dewu-api rewrite block required')
+    code = code.replace(marker, marker + '\n        proxy_set_header X-Original-URI $request_uri;')
+  }
   // P0：api-session.json 含上游 API token，公共 /data/ 一律不放行；
   // 已部署的 live conf 里的旧正则也要就地剥掉。
   code = code.replaceAll('api-session|', '').replaceAll('|api-session', '')
