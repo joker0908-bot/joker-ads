@@ -4,7 +4,8 @@
 
 - **事件**：腾讯 VOD 联通边缘 `116.162.172.54`（`tlgag.zzzjrcbank.com`、`4yyni.xiaomayipt.com` 经 `*.sched.vodtylego.tdnsvod1.cn` 唯一下发 IP）整机宕机且调度未摘除。上游每次 `/play` 动态分配 CDN，约 55-65% 播放落到这两个域名，`vseg` 回源 TCP 超时 → 502 → APP 视频不能放。与 11-17 部署无关（11-18 后零变更；huangguo 线、cloudfront、btkqgz 源同期健康）。
 - **热修（服务器侧，非本提交内容）**：`/etc/hosts` 钉 `tlgag.zzzjrcbank.com`→`119.39.203.124`、`4yyni.xiaomayipt.com`→`58.251.62.53`（已实测腾讯 `sign=` 不绑 edge IP，多个活 edge 返回同内容）；备份 `/etc/hosts.bak-vodpin-*`。**上游调度修复后须删除这两行**。`BOLUO_FETCH_MS` 8000→30000（`/etc/ads-king/admin.env`，备份 `admin.env.bak-fetchms-*`），消除远端 edge 慢取数的残余超时。
-- **本提交修复**：`/dewu-api/` 转发块补 `proxy_set_header X-Original-URI $request_uri;`——Express `dewuLegacyPath()` 靠它识别原前缀放行遗留 `?key=`；此前转发层不透传，`/dewu-api/...?key=` 恒 401（审计遗留缺陷，当前聚合方走 header、实际命中≈0）。`patchIngress` 幂等补同一行，对已部署 live conf 就地生效。
+- **本提交修复**：`/dewu-api/` 转发块补 `proxy_set_header X-Original-URI $request_uri;`——Express `dewuLegacyPath()` 靠它识别原前缀放行遗留 `?key=`；此前转发层不透传，`/dewu-api/...?key=` 恒 401（审计遗留缺陷，当前聚合方走 header、实际命中≈0）。`patchIngress` 幂等补同一行。
+- **落地经过**：线上 conf 在 11-17 部署后被人工改动过（`/dewuu`、`/dewu.apk` 改 301 到 `boluo.apk`、删除 HGJ 首访劫持门、去掉一条注释），与回执 sha 漂移，CI 部署被 `Unexpected runtime drift` 拦住。处置：手工把同一行写入线上 conf（备份 `.bak-xori-*`）、`nginx -t`+reload、公网验证 `?key=` 200/`boluo-api` 仍 401，并把 deployment.json 中该 conf 的记录 sha 更新为当前实际值；本仓库 conf 已同步为线上实况。后续 CI 部署因 patch 幂等不再改动该文件。
 - **遗留待办**：上报上游/juhe 推腾讯摘除坏节点；`PLAY_TTL_SEC`×聚合端 m3u8 缓存的 410 风险（11-20 曾爆发 3.4 万，双重编码 u= 客户端 bug 叠加）；`ufiwf.btkqgz.com` 间歇性抖动观察中。
 
 ## 2026-11-17 审计修复与 CI 强制命令入库
