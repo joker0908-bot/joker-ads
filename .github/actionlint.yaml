@@ -1,0 +1,4 @@
+self-hosted-runner:
+  labels:
+    - abc-personal-pr
+    - abc-personal-release
